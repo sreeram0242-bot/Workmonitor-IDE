@@ -221,7 +221,7 @@ function TaskChecklistItem({ task, onChange, muted }: { task: TaskRow; onChange:
             {task.status === "revision" && <RotateCcw className="h-4 w-4 text-orange-500" />}
           </div>
           {task.description && <div className="mt-1 text-sm text-slate-600">{task.description}</div>}
-          {(task.tags?.length ?? 0) > 0 && (
+          {Array.isArray(task.tags) && task.tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {task.tags!.map((t) => (
                 <span key={t} className="rounded-md border border-black/5 bg-black/5 px-2 py-0.5 text-[11px] text-slate-600">#{t}</span>
