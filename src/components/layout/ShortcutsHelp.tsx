@@ -69,7 +69,7 @@ export function ShortcutsHelp() {
         else if (k === "s") to = "/settings";
         else if (k === "a" && isAdmin) to = "/admin/analytics";
         else if (k === "m" && isAdmin) to = "/admin/team";
-        else if (k === "b" && isAdmin) to = "/admin/board";
+        else if (k === "t" && isAdmin) to = "/admin/tasks";
         else if (k === "l" && isAdmin) to = "/admin/calendar";
         clearG();
         if (to) {
@@ -105,7 +105,7 @@ export function ShortcutsHelp() {
     ...(isAdmin
       ? [
           { keys: ["G", "M"], label: "Go to Team" },
-          { keys: ["G", "B"], label: "Go to Board" },
+          { keys: ["G", "T"], label: "Go to Tasks" },
           { keys: ["G", "L"], label: "Go to Calendar" },
           { keys: ["G", "A"], label: "Go to Analytics" },
         ]

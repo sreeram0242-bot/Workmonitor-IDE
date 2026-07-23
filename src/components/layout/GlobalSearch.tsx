@@ -61,7 +61,7 @@ export function GlobalSearch() {
     if (isAdmin) {
       list.push({ id: "new-task", label: "New task", hint: "Assign to a teammate", icon: Plus, run: () => go("/admin/tasks?new=1") });
       list.push({ id: "team", label: "Manage team", icon: Users, run: () => go("/admin/team") });
-      list.push({ id: "board", label: "Task board", icon: LayoutGrid, run: () => go("/admin/board") });
+      list.push({ id: "tasks", label: "Tasks", icon: CheckCircle2, run: () => go("/admin/tasks") });
       list.push({ id: "calendar", label: "Calendar", icon: Calendar, run: () => go("/admin/calendar") });
       list.push({ id: "analytics", label: "Analytics", icon: BarChart3, run: () => go("/admin/analytics") });
     } else {
