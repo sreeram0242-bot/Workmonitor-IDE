@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { LayoutDashboard, ListChecks, MessageSquare, Users, LogOut, ShieldCheck, Menu, X, Sparkles, Settings, Calendar, Kanban, Terminal } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
