@@ -77,7 +77,7 @@ function EmployeeHome() {
 
   const q = search.trim().toLowerCase();
   const visible = tasks.filter((t) => {
-    if (t.tags?.includes("reminder")) return false;
+    if (Array.isArray(t.tags) && t.tags.includes("reminder")) return false;
     if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
     if (q && !(`${t.title} ${t.description ?? ""}`.toLowerCase().includes(q))) return false;
     return true;
@@ -89,7 +89,7 @@ function EmployeeHome() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const endOfToday = startOfToday + 24 * 60 * 60 * 1000;
-  const openTasks = tasks.filter((t) => !t.tags?.includes("reminder") && (t.status === "pending" || t.status === "revision"));
+  const openTasks = tasks.filter((t) => !(Array.isArray(t.tags) && t.tags.includes("reminder")) && (t.status === "pending" || t.status === "revision"));
   const overdueCount = openTasks.filter((t) => t.deadline && new Date(t.deadline).getTime() < now.getTime()).length;
   const dueTodayCount = openTasks.filter((t) => {
     if (!t.deadline) return false;

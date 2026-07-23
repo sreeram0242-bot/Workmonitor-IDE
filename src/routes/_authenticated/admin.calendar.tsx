@@ -94,7 +94,7 @@ function CalendarPage() {
   const tasksByDay = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
     for (const t of tasks) {
-      if (!t.deadline || t.tags?.includes("reminder")) continue;
+      if (!t.deadline || (Array.isArray(t.tags) && t.tags.includes("reminder"))) continue;
       const d = new Date(t.deadline);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       const arr = map.get(key) ?? [];

@@ -115,11 +115,11 @@ function AdminTasks() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return tasks.filter((t) => {
-      if (t.tags?.includes("reminder")) return false;
+      if (Array.isArray(t.tags) && t.tags.includes("reminder")) return false;
       if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
-      if (tagFilter && !(t.tags ?? []).includes(tagFilter)) return false;
-      if (q && !`${t.title} ${t.description ?? ""} ${(t.tags ?? []).join(" ")}`.toLowerCase().includes(q)) return false;
+      if (tagFilter && !(Array.isArray(t.tags) ? t.tags : []).includes(tagFilter)) return false;
+      if (q && !`${t.title} ${t.description ?? ""} ${(Array.isArray(t.tags) ? t.tags : []).join(" ")}`.toLowerCase().includes(q)) return false;
       return true;
     });
   }, [tasks, search, assigneeFilter, priorityFilter, tagFilter]);
@@ -127,8 +127,8 @@ function AdminTasks() {
   const allTags = useMemo(() => {
     const s = new Set<string>();
     tasks.forEach((t) => {
-      if (t.tags?.includes("reminder")) return;
-      (t.tags ?? []).forEach((x) => s.add(x));
+      if (Array.isArray(t.tags) && t.tags.includes("reminder")) return;
+      (Array.isArray(t.tags) ? t.tags : []).forEach((x) => s.add(x));
     });
     return Array.from(s).sort();
   }, [tasks]);
