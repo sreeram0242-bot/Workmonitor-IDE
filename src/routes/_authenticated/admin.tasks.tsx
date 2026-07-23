@@ -115,6 +115,7 @@ function AdminTasks() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return tasks.filter((t) => {
+      if (t.tags?.includes("reminder")) return false;
       if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (tagFilter && !(t.tags ?? []).includes(tagFilter)) return false;
@@ -125,7 +126,10 @@ function AdminTasks() {
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
-    tasks.forEach((t) => (t.tags ?? []).forEach((x) => s.add(x)));
+    tasks.forEach((t) => {
+      if (t.tags?.includes("reminder")) return;
+      (t.tags ?? []).forEach((x) => s.add(x));
+    });
     return Array.from(s).sort();
   }, [tasks]);
 
@@ -197,29 +201,32 @@ function AdminTasks() {
 
 
   return (
-    <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Tasks</h1>
-          <p className="text-sm text-muted-foreground">Assign, review, and approve team work in real time.</p>
+    <div className="relative min-h-full p-4 sm:p-6 bg-sidebar-mesh">
+      <div className="pointer-events-none absolute inset-0 sidebar-noise-overlay opacity-20" />
+      
+      <div className="relative z-10">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)]">Tasks</h1>
+            <p className="text-sm text-slate-600/80 mt-1">Assign, review, and approve team work in real time.</p>
+          </div>
+          <AssignTaskDialog team={team} adminId={user?.id ?? ""} onCreated={reloadTasks} />
         </div>
-        <AssignTaskDialog team={team} adminId={user?.id ?? ""} onCreated={reloadTasks} />
-      </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-4">
-        <div className="relative md:col-span-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title or description…" className="pl-9" />
+        <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="relative md:col-span-2">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search title or description…" className="pl-9 h-10 rounded-xl border border-black/5 bg-white/60 backdrop-blur shadow-sm focus-visible:ring-brand-accent/50" />
         </div>
         <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-          <SelectTrigger><SelectValue placeholder="Assignee" /></SelectTrigger>
+          <SelectTrigger className="h-10 rounded-xl border border-black/5 bg-white/60 backdrop-blur shadow-sm focus:ring-brand-accent/50"><SelectValue placeholder="Assignee" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All assignees</SelectItem>
             {team.map((m) => <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
+          <SelectTrigger className="h-10 rounded-xl border border-black/5 bg-white/60 backdrop-blur shadow-sm focus:ring-brand-accent/50"><SelectValue placeholder="Priority" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All priorities</SelectItem>
             <SelectItem value="low">Low</SelectItem>
@@ -230,11 +237,11 @@ function AdminTasks() {
       </div>
 
       {allTags.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Tags:</span>
-          <button onClick={() => setTagFilter(null)} className={`rounded-full border px-2.5 py-0.5 text-xs transition ${tagFilter === null ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/40 hover:bg-muted"}`}>All</button>
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-slate-500 font-medium">Tags:</span>
+          <button onClick={() => setTagFilter(null)} className={`rounded-md px-2.5 py-1 text-xs transition-all shadow-sm border ${tagFilter === null ? "border-[oklch(0.28_0.09_265)]/20 bg-[oklch(0.28_0.09_265)]/10 text-[oklch(0.28_0.09_265)] font-semibold" : "border-black/5 bg-white/60 hover:bg-white text-slate-600 backdrop-blur"}`}>All</button>
           {allTags.map((t) => (
-            <button key={t} onClick={() => setTagFilter(t)} className={`rounded-full border px-2.5 py-0.5 text-xs transition ${tagFilter === t ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/40 hover:bg-muted"}`}>
+            <button key={t} onClick={() => setTagFilter(t)} className={`rounded-md px-2.5 py-1 text-xs transition-all shadow-sm border ${tagFilter === t ? "border-[oklch(0.28_0.09_265)]/20 bg-[oklch(0.28_0.09_265)]/10 text-[oklch(0.28_0.09_265)] font-semibold" : "border-black/5 bg-white/60 hover:bg-white text-slate-600 backdrop-blur"}`}>
               #{t}
             </button>
           ))}
@@ -242,8 +249,8 @@ function AdminTasks() {
       )}
 
       {overdueCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          <AlertTriangle className="h-4 w-4" /> {overdueCount} overdue task{overdueCount === 1 ? "" : "s"} need attention
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 shadow-sm backdrop-blur">
+          <AlertTriangle className="h-4 w-4" /> <span className="font-medium">{overdueCount} overdue task{overdueCount === 1 ? "" : "s"} need attention</span>
         </div>
       )}
 
@@ -287,7 +294,7 @@ function AdminTasks() {
       </Dialog>
 
       <Tabs defaultValue="completed" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex w-full justify-start overflow-x-auto whitespace-nowrap rounded-xl bg-white/60 p-1 border border-black/5">
           <TabsTrigger value="completed">Review ({buckets.completed.length})</TabsTrigger>
           <TabsTrigger value="pending">Pending ({buckets.pending.length})</TabsTrigger>
           <TabsTrigger value="revision">Revisions ({buckets.revision.length})</TabsTrigger>
@@ -297,11 +304,11 @@ function AdminTasks() {
         {(["completed", "pending", "revision", "approved"] as const).map((k) => (
           <TabsContent key={k} value={k} className="mt-4 space-y-3">
             {loading ? (
-              <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <div className="flex items-center justify-center py-10 text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             ) : buckets[k].length === 0 ? (
-              <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Nothing here yet.</CardContent></Card>
+              <div className="rounded-2xl border border-black/5 bg-white/60 p-10 text-center text-sm text-slate-500 backdrop-blur shadow-sm">Nothing here yet.</div>
             ) : (
               buckets[k].map((t) => (
                 <TaskAdminRow
@@ -318,8 +325,8 @@ function AdminTasks() {
           </TabsContent>
         ))}
       </Tabs>
-    </>
-
+      </div>
+    </div>
   );
 }
 
@@ -609,8 +616,8 @@ function TaskAdminRow({ task, team, assigneeName, onChange, selected, onToggleSe
   const recurring = (task.recurrence ?? "none") !== "none";
 
   return (
-    <Card className={`${overdue ? "border-red-300 bg-red-50/30" : ""} ${selected ? "ring-2 ring-primary/40" : ""}`}>
-      <CardContent className="flex flex-wrap items-start justify-between gap-3 py-4">
+    <div className={`rounded-2xl border border-black/5 bg-white/60 shadow-sm transition-all hover:shadow-md hover:bg-white/80 ${overdue ? "border-red-300 bg-red-50/40" : ""} ${selected ? "ring-2 ring-[oklch(0.28_0.09_265)]/40" : ""}`}>
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 p-4 sm:p-5">
         <div className="pt-1">
           <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="Select task" />
         </div>
@@ -620,51 +627,53 @@ function TaskAdminRow({ task, team, assigneeName, onChange, selected, onToggleSe
             <Badge variant="outline" className={priorityColor(task.priority)}>{task.priority}</Badge>
             <Badge variant="outline" className={statusColor(task.status)}>{task.status}</Badge>
             {recurring && (
-              <Badge variant="outline" className="gap-1 border-blue-300 bg-blue-50 text-blue-700">
+              <Badge variant="outline" className="gap-1 border-[oklch(0.5_0.16_260)]/20 bg-[oklch(0.5_0.16_260)]/10 text-[oklch(0.5_0.16_260)]">
                 <Repeat className="h-3 w-3" /> {task.recurrence}
               </Badge>
             )}
             {overdue && <Badge variant="outline" className="border-red-300 bg-red-100 text-red-700">Overdue</Badge>}
           </div>
-          {task.description && <div className="mt-1 text-sm text-muted-foreground">{task.description}</div>}
+          {task.description && <div className="mt-1 text-sm text-slate-600">{task.description}</div>}
           {tags.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap gap-1">
               {tags.map((t) => (
-                <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">#{t}</span>
+                <span key={t} className="rounded-md border border-black/5 bg-black/5 px-2 py-0.5 text-[11px] text-slate-600">#{t}</span>
               ))}
             </div>
           )}
-          <div className="mt-2 text-xs text-muted-foreground">
-            Assigned to <span className="text-foreground">{assigneeName}</span>
+          <div className="mt-2 text-xs text-slate-500">
+            Assigned to <span className="font-medium text-slate-700">{assigneeName}</span>
             {task.deadline && <> · due {new Date(task.deadline).toLocaleString()}</>}
           </div>
           {task.revision_note && (
-            <div className="mt-2 rounded-md border border-orange-500/20 bg-orange-500/5 p-2 text-xs text-orange-500">
-              Revision note: {task.revision_note}
+            <div className="mt-3 rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-600 shadow-sm">
+              <span className="font-semibold uppercase tracking-wider">Revision note:</span> {task.revision_note}
             </div>
           )}
-          <SubtaskList taskId={task.id} canEdit={false} canToggle={false} compact />
+          <div className="mt-4">
+            <SubtaskList taskId={task.id} canEdit={false} canToggle={false} compact />
+          </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {(task.status === "completed" || task.status === "approved" || task.status === "revision") && (
-            <Button size="sm" variant="outline" onClick={() => setReviewOpen(true)}>
+            <Button size="sm" variant="default" className="bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)] text-white shadow hover:opacity-90 transition-opacity" onClick={() => setReviewOpen(true)}>
               <Eye className="mr-2 h-4 w-4" /> Review
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} title="Edit">
-            <Pencil className="h-4 w-4" />
+          <Button size="sm" variant="outline" className="border-black/5 bg-white/60 backdrop-blur hover:bg-white shadow-sm" onClick={() => setEditOpen(true)} title="Edit">
+            <Pencil className="h-4 w-4 text-slate-600" />
           </Button>
-          <Button size="sm" variant="outline" onClick={duplicate} title="Duplicate">
-            <Copy className="h-4 w-4" />
+          <Button size="sm" variant="outline" className="border-black/5 bg-white/60 backdrop-blur hover:bg-white shadow-sm" onClick={duplicate} title="Duplicate">
+            <Copy className="h-4 w-4 text-slate-600" />
           </Button>
-          <Button size="sm" variant="outline" onClick={del} className="text-red-600 hover:text-red-700" title="Delete">
+          <Button size="sm" variant="outline" onClick={del} className="border-red-500/10 bg-red-500/5 hover:bg-red-500/10 text-red-600 hover:text-red-700 shadow-sm" title="Delete">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
         <ReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} task={task} onChange={onChange} />
         <EditTaskDialog open={editOpen} onOpenChange={setEditOpen} task={task} team={team} onDone={onChange} />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

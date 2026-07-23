@@ -261,7 +261,8 @@ function LockPage() {
           ref={inputRef}
           value={pin}
           onChange={(e) => onChange(e.target.value)}
-          inputMode="numeric"
+          inputMode="none"
+          readOnly={true}
           pattern="[0-9]*"
           autoComplete="one-time-code"
           disabled={busy || mode === "loading"}

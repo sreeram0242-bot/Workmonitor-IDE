@@ -111,6 +111,39 @@ export async function sendMessage(
   if (extras.mentions && extras.mentions.length > 0) payload.mentions = extras.mentions;
   const { error } = await supabase.from("messages").insert(payload as never);
   if (error) throw error;
+
+  try {
+    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    const apiKey = import.meta.env.VITE_ONESIGNAL_API_KEY;
+    if (appId && apiKey) {
+      const members = await fetchConversationMembers(conversationId);
+      const targetIds = members.filter(id => id !== senderId);
+
+      if (targetIds.length > 0) {
+        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", senderId).maybeSingle();
+        const senderName = profile?.full_name || "Someone";
+        
+        await fetch("https://onesignal.com/api/v1/notifications", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Basic ${apiKey}`,
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            include_aliases: {
+              external_id: targetIds
+            },
+            target_channel: "push",
+            headings: { en: senderName },
+            contents: { en: content || "Sent an attachment" },
+          }),
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to send push notification", err);
+  }
 }
 
 function attachmentKind(mime: string): "image" | "video" | "file" | "audio" {

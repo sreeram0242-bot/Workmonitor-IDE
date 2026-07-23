@@ -32,4 +32,57 @@ export async function sendNotifications(items: NotifyPayload[]) {
   });
   if (filtered.length === 0) return;
   await supabase.from("notifications").insert(filtered as any);
+
+  // Send Push Notifications via OneSignal
+  const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+  const apiKey = import.meta.env.VITE_ONESIGNAL_API_KEY;
+  if (!appId || !apiKey) return;
+
+  for (const it of filtered) {
+    try {
+      await fetch("https://onesignal.com/api/v1/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Basic ${apiKey}`,
+        },
+        body: JSON.stringify({
+          app_id: appId,
+          include_aliases: { external_id: [it.user_id] },
+          target_channel: "push",
+          headings: { en: "WorkMonitor" },
+          contents: { en: it.message },
+          data: { link: it.link },
+        }),
+      });
+    } catch (err) {
+      console.error("OneSignal push error:", err);
+    }
+  }
+}
+
+export async function scheduleOneSignalNotification(userId: string, title: string, message: string, sendAfter: Date) {
+  const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+  const apiKey = import.meta.env.VITE_ONESIGNAL_API_KEY;
+  if (!appId || !apiKey) return;
+  
+  try {
+    await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${apiKey}`,
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        include_aliases: { external_id: [userId] },
+        target_channel: "push",
+        headings: { en: title },
+        contents: { en: message },
+        send_after: sendAfter.toISOString(),
+      }),
+    });
+  } catch (err) {
+    console.error("OneSignal schedule error:", err);
+  }
 }

@@ -16,13 +16,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    // Aggressively preload all workspace data into local cache so switching pages is instant
+    if (user) {
+      import("@/lib/tasks").then(({ fetchTeam, fetchTasksForAdmin, fetchTasksForUser }) => {
+        fetchTeam().catch(() => {});
+        if (role === "admin" || pathname.startsWith("/admin")) {
+          fetchTasksForAdmin().catch(() => {});
+        } else {
+          fetchTasksForUser(user.id).catch(() => {});
+        }
+      });
+    }
+  }, [user, role, pathname]);
+
   const isAdmin = role === "admin" || pathname.startsWith("/admin");
   const isDeveloper = profile?.badge === "Developer";
   const baseNav = isAdmin
     ? [
         { to: "/admin", label: "Overview", icon: LayoutDashboard, desc: "Dashboard & analytics" },
         { to: "/admin/tasks", label: "Tasks", icon: ListChecks, desc: "Assign & review" },
-        { to: "/admin/board", label: "Board", icon: Kanban, desc: "Kanban lanes" },
         { to: "/admin/calendar", label: "Calendar", icon: Calendar, desc: "Deadline view" },
         { to: "/admin/team", label: "Team", icon: Users, desc: "Members & roles" },
         { to: "/chat", label: "Chat", icon: MessageSquare, desc: "Messages & groups" },

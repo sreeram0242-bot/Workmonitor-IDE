@@ -172,6 +172,45 @@ function RootComponent() {
     };
   }, []);
 
+  useEffect(() => {
+    async function registerOneSignal() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && (window as any).OneSignalBridge) {
+        console.log("Registering OneSignal for user:", user.id);
+        (window as any).OneSignalBridge.postMessage(user.id);
+      }
+    }
+    registerOneSignal();
+  }, []);
+
+  // Global realtime notifications listener
+  useEffect(() => {
+    let notifCh: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+    async function setupNotifs() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      notifCh = supabase.channel("global-notifs")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
+          const { message, link } = payload.new as any;
+          if (link) {
+            toast(message, {
+              action: { label: "View", onClick: () => router.navigate({ to: link }) },
+              duration: 5000,
+            });
+          } else {
+            toast.info(message, { duration: 5000 });
+          }
+        })
+        .subscribe();
+    }
+    setupNotifs();
+    return () => {
+      cancelled = true;
+      if (notifCh) supabase.removeChannel(notifCh);
+    };
+  }, [router]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

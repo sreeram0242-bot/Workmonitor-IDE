@@ -860,7 +860,21 @@ function ChatPage() {
                   const isStarred = starredIds.has(m.id);
                   const fxIcon = fx ? MESSAGE_EFFECTS.find((e) => e.id === fx)?.icon ?? "" : "";
                   return (
-                    <div key={m.id} id={`msg-${m.id}`} className={`group/msg flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} rounded-lg transition-shadow`}>
+                    <GestureWrapper
+                      key={m.id}
+                      onSwipeLeft={() => setReplyTo(m)}
+                      onLongPress={() => {
+                        const btn = document.querySelector(`#msg-${m.id} .msg-react-btn`) as HTMLButtonElement;
+                        btn?.click();
+                      }}
+                      onTap={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('button') || target.closest('a') || target.closest('input')) return;
+                        const btn = document.querySelector(`#msg-${m.id} .msg-options-btn`) as HTMLButtonElement;
+                        btn?.click();
+                      }}
+                    >
+                      <div id={`msg-${m.id}`} className={`group/msg flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} rounded-lg transition-shadow`}>
                       {!mine && (
                         <div className="w-8">
                           {showAvatar && <Avatar name={sender?.full_name ?? "?"} admin={sender?.role === "admin"} size={32} url={sender?.avatar_url} />}
@@ -1000,7 +1014,7 @@ function ChatPage() {
                           <div className={`absolute -top-3 ${mine ? "right-1" : "left-1"} flex items-center gap-0.5 rounded-full bg-white/95 px-0.5 shadow ring-1 ring-black/5 opacity-0 transition-opacity group-hover/msg:opacity-100`}>
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button className="rounded-full p-1 text-slate-700 hover:bg-accent" aria-label="React">
+                                <button className="msg-react-btn rounded-full p-1 text-slate-700 hover:bg-accent" aria-label="React">
                                   <Smile className="h-3.5 w-3.5" />
                                 </button>
                               </PopoverTrigger>
@@ -1024,7 +1038,7 @@ function ChatPage() {
                             </button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <button className="rounded-full p-1 text-slate-700 hover:bg-accent" aria-label="Message actions">
+                                <button className="msg-options-btn rounded-full p-1 text-slate-700 hover:bg-accent" aria-label="Message actions">
                                   <MoreVertical className="h-3.5 w-3.5" />
                                 </button>
                               </DropdownMenuTrigger>
@@ -1069,6 +1083,7 @@ function ChatPage() {
                         )}
                       </div>
                     </div>
+                  </GestureWrapper>
                   );
                 })}
                 {typingNames.length > 0 && (
@@ -1398,6 +1413,99 @@ const EMOJI_GROUPS: { label: string; emojis: string[] }[] = [
   { label: "Gestures", emojis: ["👍","👎","👌","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤏","💪","🙌","👏","🫶","❤️","🧡","💛","💚","💙","💜","🖤","🤍","💯","🔥","⭐","✨","🎉","🎊","🎁","💎","💡","✅","❌","⚠️","❓","❗"] },
   { label: "Work", emojis: ["💻","🖥️","⌨️","🖱️","📱","📞","☎️","📧","📨","📩","📤","📥","📎","📌","📍","📝","✏️","📊","📈","📉","📅","📆","🗓️","⏰","⏳","⌛","🔔","🔕","🔒","🔓","🔑","💼","🗂️","📁","📂","🧠","☕","🍕","🍔","🚀"] },
 ];
+
+function GestureWrapper({ 
+  children, 
+  onSwipeLeft, 
+  onLongPress, 
+  onTap 
+}: { 
+  children: React.ReactNode; 
+  onSwipeLeft: () => void;
+  onLongPress: () => void;
+  onTap: (e: React.PointerEvent) => void;
+}) {
+  const [translateX, setTranslateX] = useState(0);
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+  const startTime = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const isSwiping = useRef(false);
+  const isLongPressTriggered = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    startTime.current = Date.now();
+    isSwiping.current = false;
+    isLongPressTriggered.current = false;
+    
+    timerRef.current = window.setTimeout(() => {
+      isLongPressTriggered.current = true;
+      onLongPress();
+    }, 500);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (startX.current === null || startY.current === null) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    }
+
+    if (!isSwiping.current && dx < -10 && Math.abs(dx) > Math.abs(dy)) {
+      isSwiping.current = true;
+    }
+
+    if (isSwiping.current && dx < 0) {
+      setTranslateX(Math.max(-60, dx));
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    
+    if (startX.current !== null && startTime.current !== null) {
+      const dx = e.clientX - startX.current;
+      const dy = e.clientY - (startY.current ?? e.clientY);
+      const dt = Date.now() - startTime.current;
+
+      if (isSwiping.current && dx < -40) {
+        onSwipeLeft();
+      } else if (!isSwiping.current && !isLongPressTriggered.current && Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 500) {
+        onTap(e);
+      }
+    }
+
+    startX.current = null;
+    startY.current = null;
+    startTime.current = null;
+    isSwiping.current = false;
+    isLongPressTriggered.current = false;
+    setTranslateX(0);
+  };
+
+  return (
+    <div 
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onContextMenu={(e) => {
+        if (window.matchMedia("(max-width: 768px)").matches) {
+          e.preventDefault();
+        }
+      }}
+      style={{ transform: `translateX(${translateX}px)` }}
+      className="transition-transform duration-200 ease-out will-change-transform touch-pan-y"
+    >
+      {children}
+    </div>
+  );
+}
 
 function EmojiPicker({ onPick, disabled }: { onPick: (emoji: string) => void; disabled?: boolean }) {
   const [tab, setTab] = useState(0);

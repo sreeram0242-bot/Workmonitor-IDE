@@ -1,10 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fetchTasksForAdmin, fetchTeam, getCachedAdminTasks, getCachedTeam, type TaskRow, type TeamMember } from "@/lib/tasks";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { fetchTasksForAdmin, fetchTeam, getCachedAdminTasks, getCachedTeam, fetchReminders, addReminder, type TaskRow, type TeamMember, type ReminderRow } from "@/lib/tasks";
+import { scheduleOneSignalNotification } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/admin/calendar")({
   head: () => ({
@@ -25,18 +31,52 @@ function addMonths(d: Date, n: number) { return new Date(d.getFullYear(), d.getM
 function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
 function CalendarPage() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<TaskRow[]>(() => getCachedAdminTasks() ?? []);
   const [team, setTeam] = useState<TeamMember[]>(() => getCachedTeam() ?? []);
+  const [reminders, setReminders] = useState<ReminderRow[]>([]);
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+
+  // Reminder Dialog State
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [reminderTitle, setReminderTitle] = useState("");
+  const [reminderTime, setReminderTime] = useState("09:00");
+  const [addingReminder, setAddingReminder] = useState(false);
 
   useEffect(() => {
     fetchTasksForAdmin().then(setTasks).catch(() => {});
     fetchTeam().then(setTeam).catch(() => {});
+    fetchReminders().then(setReminders).catch(() => {});
     const ch = supabase.channel("cal-tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
       fetchTasksForAdmin().then(setTasks).catch(() => {});
     }).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
+
+  async function handleAddReminder(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedDate || !user) return;
+    try {
+      setAddingReminder(true);
+      const [hours, minutes] = reminderTime.split(":");
+      const remindAt = new Date(selectedDate);
+      remindAt.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      
+      const r = await addReminder(reminderTitle, remindAt);
+      if (r) setReminders((prev) => [...prev, r]);
+      
+      await scheduleOneSignalNotification(user.id, "WorkMonitor Reminder", reminderTitle, remindAt);
+      
+      toast.success("Reminder set!");
+      setReminderDialogOpen(false);
+      setReminderTitle("");
+    } catch (err) {
+      toast.error("Failed to add reminder");
+    } finally {
+      setAddingReminder(false);
+    }
+  }
 
   const nameOf = (id: string) => team.find((t) => t.id === id)?.full_name ?? "—";
 
@@ -54,7 +94,7 @@ function CalendarPage() {
   const tasksByDay = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
     for (const t of tasks) {
-      if (!t.deadline) continue;
+      if (!t.deadline || t.tags?.includes("reminder")) continue;
       const d = new Date(t.deadline);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       const arr = map.get(key) ?? [];
@@ -63,6 +103,18 @@ function CalendarPage() {
     }
     return map;
   }, [tasks]);
+
+  const remindersByDay = useMemo(() => {
+    const map = new Map<string, ReminderRow[]>();
+    for (const r of reminders) {
+      const d = new Date(r.remind_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const arr = map.get(key) ?? [];
+      arr.push(r);
+      map.set(key, arr);
+    }
+    return map;
+  }, [reminders]);
 
   const priColor = (p: TaskRow["priority"]) => p === "high" ? "bg-red-500" : p === "medium" ? "bg-amber-500" : "bg-emerald-500";
   const today = new Date();
@@ -97,8 +149,21 @@ function CalendarPage() {
             return (
               <div key={key} className={`min-h-[110px] border-b border-r p-1.5 text-xs ${d ? "" : "bg-muted/10"}`}>
                 {d && (
-                  <div className={`mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${isToday ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
-                    {d.getDate()}
+                  <div className="flex items-center justify-between mb-1">
+                    <div className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${isToday ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+                      {d.getDate()}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDate(d);
+                        setReminderDialogOpen(true);
+                      }}
+                      className="text-muted-foreground hover:text-primary p-0.5 rounded transition"
+                      aria-label="Add reminder"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
                   </div>
                 )}
                 <div className="space-y-1">
@@ -109,8 +174,15 @@ function CalendarPage() {
                       <span className="ml-auto hidden truncate text-[10px] text-muted-foreground sm:inline">{nameOf(t.assigned_to)}</span>
                     </div>
                   ))}
+                  {(remindersByDay.get(key) ?? []).map((r) => (
+                    <div key={r.id} className="flex items-center gap-1.5 truncate rounded-md border border-purple-200 bg-purple-50/50 px-1.5 py-1 text-purple-700">
+                      <Bell className="h-2.5 w-2.5 shrink-0" />
+                      <span className="truncate font-medium">{r.title}</span>
+                      <span className="ml-auto text-[9px] font-mono">{new Date(r.remind_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  ))}
                   {items.length > 3 && (
-                    <div className="pl-1 text-[10px] text-muted-foreground">+{items.length - 3} more</div>
+                    <div className="pl-1 text-[10px] text-muted-foreground">+{items.length - 3} tasks</div>
                   )}
                 </div>
               </div>
@@ -118,6 +190,41 @@ function CalendarPage() {
           })}
         </div>
       </Card>
+
+      <Dialog open={reminderDialogOpen} onOpenChange={setReminderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Reminder for {selectedDate?.toLocaleDateString()}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddReminder} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Reminder Note</Label>
+              <Input
+                value={reminderTitle}
+                onChange={(e) => setReminderTitle(e.target.value)}
+                placeholder="Call the client..."
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Time</Label>
+              <Input
+                type="time"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setReminderDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={addingReminder}>
+                {addingReminder ? "Saving..." : "Set Reminder"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

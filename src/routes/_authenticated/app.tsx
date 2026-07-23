@@ -77,6 +77,7 @@ function EmployeeHome() {
 
   const q = search.trim().toLowerCase();
   const visible = tasks.filter((t) => {
+    if (t.tags?.includes("reminder")) return false;
     if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
     if (q && !(`${t.title} ${t.description ?? ""}`.toLowerCase().includes(q))) return false;
     return true;
@@ -88,7 +89,7 @@ function EmployeeHome() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const endOfToday = startOfToday + 24 * 60 * 60 * 1000;
-  const openTasks = tasks.filter((t) => t.status === "pending" || t.status === "revision");
+  const openTasks = tasks.filter((t) => !t.tags?.includes("reminder") && (t.status === "pending" || t.status === "revision"));
   const overdueCount = openTasks.filter((t) => t.deadline && new Date(t.deadline).getTime() < now.getTime()).length;
   const dueTodayCount = openTasks.filter((t) => {
     if (!t.deadline) return false;
@@ -106,37 +107,42 @@ function EmployeeHome() {
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
-    <>
-      <div className="mb-6">
-        <h1 className="font-display text-3xl font-bold">{greet}, {firstName}</h1>
-        <p className="text-sm text-muted-foreground">Here's your day at a glance.</p>
-      </div>
+    <div className="relative min-h-full p-4 sm:p-6 bg-sidebar-mesh">
+      <div className="pointer-events-none absolute inset-0 sidebar-noise-overlay opacity-20" />
+      
+      <div className="relative z-10">
+        <div className="mb-6">
+          <h1 className="font-display text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)]">
+            {greet}, {firstName}
+          </h1>
+          <p className="text-sm text-slate-600/80 mt-1">Here's your day at a glance.</p>
+        </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatChip label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "danger" : "muted"} />
-        <StatChip label="Due today" value={dueTodayCount} tone={dueTodayCount > 0 ? "warn" : "muted"} />
-        <StatChip label="Upcoming" value={upcomingCount} tone="brand" />
-        <StatChip label="Approved today" value={approvedToday} tone={approvedToday > 0 ? "success" : "muted"} />
-      </div>
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatChip label="Overdue" value={overdueCount} tone={overdueCount > 0 ? "danger" : "muted"} />
+          <StatChip label="Due today" value={dueTodayCount} tone={dueTodayCount > 0 ? "warn" : "muted"} />
+          <StatChip label="Upcoming" value={upcomingCount} tone="brand" />
+          <StatChip label="Approved today" value={approvedToday} tone={approvedToday > 0 ? "success" : "muted"} />
+        </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search tasks…"
-          className="h-9 min-w-[220px] flex-1 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-brand-accent"
-        />
-        <select
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
-          className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-        >
-          <option value="all">All priorities</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
-      </div>
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tasks…"
+            className="h-10 min-w-[220px] flex-1 rounded-xl border border-black/5 bg-white/60 px-4 text-sm outline-none backdrop-blur shadow-sm focus:border-brand-accent focus:ring-1 focus:ring-brand-accent/50 transition-all placeholder:text-slate-400"
+          />
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
+            className="h-10 rounded-xl border border-black/5 bg-white/60 px-3 text-sm backdrop-blur shadow-sm outline-none focus:border-brand-accent transition-all"
+          >
+            <option value="all">All priorities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
 
       {initial ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
@@ -153,20 +159,21 @@ function EmployeeHome() {
           <Section title="Approved" items={done} onChange={reload} muted />
         </div>
       )}
-    </>
+      </div>
+    </div>
   );
 }
 
 function StatChip({ label, value, tone }: { label: string; value: number; tone: "danger" | "warn" | "brand" | "success" | "muted" }) {
   const toneClass = {
-    danger: "border-red-200 bg-red-50 text-red-700",
-    warn: "border-amber-200 bg-amber-50 text-amber-700",
-    brand: "border-blue-200 bg-blue-50 text-blue-700",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    muted: "border-border/60 bg-secondary/40 text-muted-foreground",
+    danger: "border-red-500/20 bg-red-500/5 text-red-600",
+    warn: "border-amber-500/20 bg-amber-500/5 text-amber-600",
+    brand: "border-[oklch(0.28_0.09_265)]/20 bg-[oklch(0.28_0.09_265)]/5 text-[oklch(0.28_0.09_265)]",
+    success: "border-emerald-500/20 bg-emerald-500/5 text-emerald-600",
+    muted: "border-black/5 bg-white/60 text-slate-600",
   }[tone];
   return (
-    <div className={`rounded-xl border px-4 py-3 shadow-sm transition ${toneClass}`}>
+    <div className={`rounded-2xl border px-4 py-3 shadow-sm transition-all hover:scale-[1.02] ${toneClass}`}>
       <div className="text-[10px] font-semibold uppercase tracking-wider opacity-80">{label}</div>
       <div className="mt-0.5 font-display text-2xl font-bold tabular-nums">{value}</div>
     </div>
@@ -196,8 +203,8 @@ function TaskChecklistItem({ task, onChange, muted }: { task: TaskRow; onChange:
   const overdue = isOverdue(task);
 
   return (
-    <Card className={`${muted ? "opacity-90" : ""} ${overdue ? "border-red-300 bg-red-50/40" : ""}`}>
-      <CardContent className="flex flex-wrap items-start gap-3 py-4">
+    <div className={`rounded-2xl border border-black/5 bg-white/80 shadow-sm transition-all hover:shadow-md hover:bg-white/95 ${muted ? "opacity-90" : ""} ${overdue ? "border-red-300 bg-red-50/40" : ""}`}>
+      <div className="flex flex-col sm:flex-row items-start gap-4 p-4 sm:p-5">
         <Checkbox
           checked={!canComplete}
           disabled={!canComplete}
@@ -213,39 +220,39 @@ function TaskChecklistItem({ task, onChange, muted }: { task: TaskRow; onChange:
             {task.status === "approved" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
             {task.status === "revision" && <RotateCcw className="h-4 w-4 text-orange-500" />}
           </div>
-          {task.description && <div className="mt-1 text-sm text-muted-foreground">{task.description}</div>}
+          {task.description && <div className="mt-1 text-sm text-slate-600">{task.description}</div>}
           {(task.tags?.length ?? 0) > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap gap-1">
               {task.tags!.map((t) => (
-                <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">#{t}</span>
+                <span key={t} className="rounded-md border border-black/5 bg-black/5 px-2 py-0.5 text-[11px] text-slate-600">#{t}</span>
               ))}
             </div>
           )}
           {task.deadline && (
-            <div className={`mt-1 text-xs ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+            <div className={`mt-2 text-xs ${overdue ? "text-red-600 font-medium" : "text-slate-500"}`}>
               Due {new Date(task.deadline).toLocaleString()}
             </div>
           )}
           {task.revision_note && (
-            <div className="mt-2 rounded-md border border-orange-500/20 bg-orange-500/5 p-2 text-xs text-orange-500">
-              Revision requested: {task.revision_note}
+            <div className="mt-3 rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-600 shadow-sm">
+              <span className="font-semibold uppercase tracking-wider">Revision requested:</span> {task.revision_note}
             </div>
           )}
-          <div className="mt-3">
+          <div className="mt-4">
             <SubtaskList taskId={task.id} canEdit={false} canToggle={canComplete} />
           </div>
-          <div className="mt-3">
+          <div className="mt-4">
             <TaskComments taskId={task.id} />
           </div>
         </div>
         {canComplete && (
-          <Button size="sm" variant="outline" onClick={() => setUploadOpen(true)}>
+          <Button size="sm" variant="default" className="bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)] text-white shadow hover:opacity-90 transition-opacity" onClick={() => setUploadOpen(true)}>
             <ImagePlus className="mr-2 h-4 w-4" /> Complete
           </Button>
         )}
         <UploadProofDialog open={uploadOpen} onOpenChange={setUploadOpen} task={task} onDone={onChange} />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

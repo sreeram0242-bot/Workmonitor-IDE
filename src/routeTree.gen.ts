@@ -20,7 +20,6 @@ import { Route as AuthenticatedDevRouteImport } from './routes/_authenticated/de
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as AuthenticatedAdminBoardRouteImport } from './routes/_authenticated/admin.board'
 import { Route as AuthenticatedAdminCalendarRouteImport } from './routes/_authenticated/admin.calendar'
 import { Route as AuthenticatedAdminTasksRouteImport } from './routes/_authenticated/admin.tasks'
 import { Route as AuthenticatedAdminTeamRouteImport } from './routes/_authenticated/admin.team'
@@ -79,11 +78,6 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
-const AuthenticatedAdminBoardRoute = AuthenticatedAdminBoardRouteImport.update({
-  id: '/board',
-  path: '/board',
-  getParentRoute: () => AuthenticatedAdminRoute,
-} as any)
 const AuthenticatedAdminCalendarRoute =
   AuthenticatedAdminCalendarRouteImport.update({
     id: '/calendar',
@@ -111,7 +105,6 @@ export interface FileRoutesByFullPath {
   '/dev': typeof AuthenticatedDevRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
-  '/admin/board': typeof AuthenticatedAdminBoardRoute
   '/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/admin/tasks': typeof AuthenticatedAdminTasksRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -126,7 +119,6 @@ export interface FileRoutesByTo {
   '/dev': typeof AuthenticatedDevRoute
   '/overview': typeof AuthenticatedOverviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
-  '/admin/board': typeof AuthenticatedAdminBoardRoute
   '/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/admin/tasks': typeof AuthenticatedAdminTasksRoute
   '/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -144,7 +136,6 @@ export interface FileRoutesById {
   '/_authenticated/dev': typeof AuthenticatedDevRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
-  '/_authenticated/admin/board': typeof AuthenticatedAdminBoardRoute
   '/_authenticated/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/_authenticated/admin/tasks': typeof AuthenticatedAdminTasksRoute
   '/_authenticated/admin/team': typeof AuthenticatedAdminTeamRoute
@@ -162,7 +153,6 @@ export interface FileRouteTypes {
     | '/dev'
     | '/overview'
     | '/settings'
-    | '/admin/board'
     | '/admin/calendar'
     | '/admin/tasks'
     | '/admin/team'
@@ -177,7 +167,6 @@ export interface FileRouteTypes {
     | '/dev'
     | '/overview'
     | '/settings'
-    | '/admin/board'
     | '/admin/calendar'
     | '/admin/tasks'
     | '/admin/team'
@@ -194,7 +183,6 @@ export interface FileRouteTypes {
     | '/_authenticated/dev'
     | '/_authenticated/overview'
     | '/_authenticated/settings'
-    | '/_authenticated/admin/board'
     | '/_authenticated/admin/calendar'
     | '/_authenticated/admin/tasks'
     | '/_authenticated/admin/team'
@@ -287,13 +275,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/board': {
-      id: '/_authenticated/admin/board'
-      path: '/board'
-      fullPath: '/admin/board'
-      preLoaderRoute: typeof AuthenticatedAdminBoardRouteImport
-      parentRoute: typeof AuthenticatedAdminRoute
-    }
     '/_authenticated/admin/calendar': {
       id: '/_authenticated/admin/calendar'
       path: '/calendar'
@@ -319,7 +300,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteChildren {
-  AuthenticatedAdminBoardRoute: typeof AuthenticatedAdminBoardRoute
   AuthenticatedAdminCalendarRoute: typeof AuthenticatedAdminCalendarRoute
   AuthenticatedAdminTasksRoute: typeof AuthenticatedAdminTasksRoute
   AuthenticatedAdminTeamRoute: typeof AuthenticatedAdminTeamRoute
@@ -327,7 +307,6 @@ interface AuthenticatedAdminRouteChildren {
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
-  AuthenticatedAdminBoardRoute: AuthenticatedAdminBoardRoute,
   AuthenticatedAdminCalendarRoute: AuthenticatedAdminCalendarRoute,
   AuthenticatedAdminTasksRoute: AuthenticatedAdminTasksRoute,
   AuthenticatedAdminTeamRoute: AuthenticatedAdminTeamRoute,

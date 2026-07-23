@@ -172,3 +172,69 @@ export async function deleteSubtask(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export interface ReminderRow {
+  id: string;
+  user_id: string;
+  title: string;
+  remind_at: string;
+  notified: boolean;
+  created_at: string;
+}
+
+export async function fetchReminders(): Promise<ReminderRow[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("assigned_to", user.id)
+    .contains("tags", ["reminder"])
+    .order("deadline", { ascending: true });
+  
+  if (error) {
+    console.error("fetchReminders error:", error);
+    return [];
+  }
+  
+  return (data ?? []).map((t: any) => ({
+    id: t.id,
+    user_id: t.assigned_to,
+    title: t.title.replace("Reminder: ", ""),
+    remind_at: t.deadline || new Date().toISOString(),
+    notified: t.status === "completed",
+    created_at: t.created_at,
+  }));
+}
+
+export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({ 
+      title: `Reminder: ${title}`, 
+      assigned_to: user.id, 
+      assigned_by: user.id,
+      deadline: remindAt.toISOString(),
+      priority: "medium",
+      status: "pending",
+      recurrence: "none",
+      tags: ["reminder"]
+    })
+    .select("*")
+    .single();
+    
+  if (error) {
+    console.error("addReminder error:", error);
+    throw error;
+  }
+  
+  return {
+    id: data.id,
+    user_id: data.assigned_to,
+    title: data.title.replace("Reminder: ", ""),
+    remind_at: data.deadline || new Date().toISOString(),
+    notified: false,
+    created_at: data.created_at,
+  };
+}
