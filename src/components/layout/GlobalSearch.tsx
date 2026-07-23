@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, ListChecks, User, Plus, MessageSquare, Settings as SettingsIcon, BarChart3, Users, LayoutGrid, Calendar, LogOut, ArrowRight } from "lucide-react";
+import { Search, ListChecks, User, Plus, MessageSquare, Settings as SettingsIcon, BarChart3, Users, LayoutGrid, Calendar, LogOut, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
