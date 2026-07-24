@@ -37,9 +37,9 @@ export const checkPasscode = createServerFn({ method: "GET" }).handler(async () 
   const auth = await getAuthOrThrow(getReqOrThrow());
   const profile = await prisma.profile.findUnique({
     where: { id: auth.userId },
-    select: { passcode: true },
+    select: { passcode_hash: true },
   });
-  return !!profile?.passcode;
+  return !!profile?.passcode_hash;
 });
 
 export const verifyPasscode = createServerFn({ method: "POST" })
@@ -48,9 +48,9 @@ export const verifyPasscode = createServerFn({ method: "POST" })
     const auth = await getAuthOrThrow(getReqOrThrow());
     const profile = await prisma.profile.findUnique({
       where: { id: auth.userId },
-      select: { passcode: true },
+      select: { passcode_hash: true },
     });
-    return profile?.passcode === pin;
+    return profile?.passcode_hash === pin;
   });
 
 export const updatePasscode = createServerFn({ method: "POST" })
@@ -59,7 +59,7 @@ export const updatePasscode = createServerFn({ method: "POST" })
     const auth = await getAuthOrThrow(getReqOrThrow());
     await prisma.profile.update({
       where: { id: auth.userId },
-      data: { passcode: pin },
+      data: { passcode_hash: pin },
     });
     return true;
   });
