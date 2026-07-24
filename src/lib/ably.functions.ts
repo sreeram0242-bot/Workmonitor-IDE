@@ -2,17 +2,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
 import * as Ably from "ably";
 
-// Singleton REST client
-export const ablyRest = new Ably.Rest({
-  key: process.env.ABLY_API_KEY || "",
-});
+let _ablyRest: Ably.Rest | null = null;
+function getAblyRest() {
+  if (!_ablyRest) {
+    const key = typeof process !== "undefined" ? process.env.ABLY_API_KEY : undefined;
+    _ablyRest = new Ably.Rest({ key: key || "dummy:key" });
+  }
+  return _ablyRest;
+}
 
 export const getAblyToken = createServerFn({ method: "POST" }).handler(async () => {
   const authResult = await auth();
   if (!authResult.userId) throw new Error("Unauthorized");
 
   try {
-    const tokenRequestData = await ablyRest.auth.createTokenRequest({
+    const tokenRequestData = await getAblyRest().auth.createTokenRequest({
       clientId: authResult.userId,
     });
     return tokenRequestData;
@@ -24,12 +28,12 @@ export const getAblyToken = createServerFn({ method: "POST" }).handler(async () 
 
 // Helper function to broadcast messages from other server functions
 export async function broadcast(channelName: string, eventName: string, data: any) {
-  if (!process.env.ABLY_API_KEY) {
+  if (typeof process === "undefined" || !process.env.ABLY_API_KEY) {
     console.warn("ABLY_API_KEY not set. Skipping broadcast:", channelName, eventName);
     return;
   }
   try {
-    const channel = ablyRest.channels.get(channelName);
+    const channel = getAblyRest().channels.get(channelName);
     await channel.publish(eventName, data);
   } catch (e) {
     console.error("Ably broadcast error:", e);
