@@ -1,9 +1,22 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, ListChecks, MessageSquare, Users, LogOut, ShieldCheck, Menu, X, Sparkles, Settings, Calendar, Kanban, Terminal } from "lucide-react";
+import {
+  LayoutDashboard,
+  ListChecks,
+  MessageSquare,
+  Users,
+  LogOut,
+  ShieldCheck,
+  Menu,
+  X,
+  Sparkles,
+  Settings,
+  Calendar,
+  Kanban,
+  Terminal,
+} from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
@@ -11,7 +24,7 @@ import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { ShortcutsHelp } from "@/components/layout/ShortcutsHelp";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { role, profile, user } = useAuth();
+  const { role, profile, user, signOut: authSignOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -51,10 +64,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? [...baseNav, { to: "/dev", label: "Dev Console", icon: Terminal, desc: "Restricted zone" }]
     : baseNav;
 
-
-
   async function signOut() {
-    await supabase.auth.signOut();
+    await authSignOut();
     toast.success("Signed out");
     navigate({ to: "/auth" });
   }
@@ -73,15 +84,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* right edge divider */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-border/70" />
 
-
-
       {/* Brand header */}
       <div className="relative flex items-center justify-between px-5 pb-5 pt-6">
         <Link to="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-3">
           <Logo showText={false} className="h-10 w-10" />
           <div className="leading-tight">
             <div className="font-display text-base font-semibold tracking-wide">C-Enterprises</div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">WorkMonitor</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/60">
+              WorkMonitor
+            </div>
           </div>
         </Link>
         <button
@@ -100,8 +111,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : (
           <Sparkles className="h-4 w-4 text-[oklch(0.5_0.16_260)]" />
         )}
-          <div className="text-xs">
-            <div className="font-medium">{isAdmin ? "Admin Portal" : "User Portal"}</div>
+        <div className="text-xs">
+          <div className="font-medium">{isAdmin ? "Admin Portal" : "User Portal"}</div>
           <div className="text-[10px] text-sidebar-foreground/60">Real-time workspace</div>
         </div>
       </div>
@@ -112,7 +123,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <nav className="relative flex-1 space-y-1 overflow-hidden px-3">
         {nav.map((item) => {
-          const active = pathname === item.to || (item.to !== "/admin" && pathname.startsWith(item.to));
+          const active =
+            pathname === item.to || (item.to !== "/admin" && pathname.startsWith(item.to));
           return (
             <Link
               key={item.to}
@@ -159,7 +171,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{profile?.full_name || user?.email}</div>
-            <div className="truncate text-[10px] text-sidebar-foreground/60">{profile?.position || (isAdmin ? "Admin" : "Employee")}</div>
+            <div className="truncate text-[10px] text-sidebar-foreground/60">
+              {profile?.position || (isAdmin ? "Admin" : "Employee")}
+            </div>
           </div>
           <button
             onClick={signOut}
@@ -176,9 +190,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      <aside className="hidden w-72 flex-col md:flex">
-        {SidebarInner}
-      </aside>
+      <aside className="hidden w-72 flex-col md:flex">{SidebarInner}</aside>
 
       {/* Mobile drawer */}
       {mobileOpen && (
@@ -193,9 +205,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className={`sticky top-0 z-30 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/70 px-4 py-3 backdrop-blur-xl sm:px-6 ${pathname === "/chat" ? "grid md:hidden" : "grid"}`}>
+        <header
+          className={`sticky top-0 z-30 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 bg-background/70 px-4 py-3 backdrop-blur-xl sm:px-6 ${pathname === "/chat" ? "grid md:hidden" : "grid"}`}
+        >
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMobileOpen(true)}
@@ -204,17 +217,22 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="md:hidden"><Logo showText={false} className="h-8 w-8" /></div>
+            <div className="md:hidden">
+              <Logo showText={false} className="h-8 w-8" />
+            </div>
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold">{profile?.full_name || user?.email}</span>
+              <span className="truncate text-sm font-semibold">
+                {profile?.full_name || user?.email}
+              </span>
               <span className="hidden rounded-full border border-border/70 bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-block">
                 {isAdmin ? "Admin" : "User"}
               </span>
             </div>
-            <div className="truncate text-xs text-muted-foreground">{profile?.position || (isAdmin ? "Administrator" : "Team member")}</div>
-
+            <div className="truncate text-xs text-muted-foreground">
+              {profile?.position || (isAdmin ? "Administrator" : "Team member")}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <GlobalSearch />
@@ -226,11 +244,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </header>
-        <main className="relative min-w-0 flex-1 overflow-hidden bg-white" aria-busy={!profile && !user}>
-          <div key={pathname} className={pathname === "/chat" ? "page-view relative h-full" : "page-view relative mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8"}>
+        <main
+          className="relative min-w-0 flex-1 overflow-hidden bg-white"
+          aria-busy={!profile && !user}
+        >
+          <div
+            key={pathname}
+            className={
+              pathname === "/chat"
+                ? "page-view relative h-full"
+                : "page-view relative mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8"
+            }
+          >
             {children}
           </div>
-
         </main>
       </div>
     </div>

@@ -25,12 +25,7 @@ function isTypingTarget(el: EventTarget | null): boolean {
   const n = el as HTMLElement | null;
   if (!n) return false;
   const tag = n.tagName;
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    n.isContentEditable === true
-  );
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || n.isContentEditable === true;
 }
 
 export function ShortcutsHelp() {
@@ -45,7 +40,10 @@ export function ShortcutsHelp() {
 
     function clearG() {
       awaitingG = false;
-      if (gTimer) { clearTimeout(gTimer); gTimer = null; }
+      if (gTimer) {
+        clearTimeout(gTimer);
+        gTimer = null;
+      }
     }
 
     function onKey(e: KeyboardEvent) {
@@ -156,7 +154,11 @@ export function ShortcutsHelp() {
               </div>
             ))}
             <p className="text-xs text-muted-foreground">
-              Tip: press <kbd className="rounded border bg-secondary/60 px-1.5 py-0.5 text-[10px] font-mono">G</kbd> then a letter to jump between pages.
+              Tip: press{" "}
+              <kbd className="rounded border bg-secondary/60 px-1.5 py-0.5 text-[10px] font-mono">
+                G
+              </kbd>{" "}
+              then a letter to jump between pages.
             </p>
           </div>
         </DialogContent>

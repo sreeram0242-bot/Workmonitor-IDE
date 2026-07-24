@@ -3,16 +3,24 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, ListChecks, AlertTriangle, ArrowRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { fetchTasksForUser, getCachedUserTasks, priorityColor, statusColor, type TaskRow } from "@/lib/tasks";
+import {
+  fetchTasksForUser,
+  getCachedUserTasks,
+  priorityColor,
+  statusColor,
+  type TaskRow,
+} from "@/lib/tasks";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/overview")({
   head: () => ({
     meta: [
       { title: "Overview — C-Enterprises WorkMonitor" },
-      { name: "description", content: "Your personal workspace overview with task stats and recent activity." },
+      {
+        name: "description",
+        content: "Your personal workspace overview with task stats and recent activity.",
+      },
       { property: "og:title", content: "Overview — C-Enterprises WorkMonitor" },
       { property: "og:description", content: "Personal task overview and productivity snapshot." },
       { property: "og:type", content: "website" },
@@ -30,15 +38,7 @@ function UserOverview() {
   useEffect(() => {
     if (!user) return;
     fetchTasksForUser(user.id).then(setTasks);
-    const ch = supabase
-      .channel(`overview-user-${user.id}-${Math.random().toString(36).slice(2, 8)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, (payload) => {
-        const n = (payload.new ?? {}) as Partial<TaskRow>;
-        const o = (payload.old ?? {}) as Partial<TaskRow>;
-        if (n.assigned_to === user.id || o.assigned_to === user.id) fetchTasksForUser(user.id).then(setTasks);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // Realtime polling will be implemented in Stage 5
   }, [user?.id]);
 
   const now = Date.now();
@@ -56,25 +56,51 @@ function UserOverview() {
   const approvedTotal = tasks.filter((t) => t.status === "approved").length;
 
   const stats = [
-    { label: "Overdue", value: overdue, icon: AlertTriangle, tone: overdue > 0 ? "text-red-600" : "text-muted-foreground" },
-    { label: "Due today", value: dueToday, icon: Clock, tone: dueToday > 0 ? "text-amber-600" : "text-muted-foreground" },
+    {
+      label: "Overdue",
+      value: overdue,
+      icon: AlertTriangle,
+      tone: overdue > 0 ? "text-red-600" : "text-muted-foreground",
+    },
+    {
+      label: "Due today",
+      value: dueToday,
+      icon: Clock,
+      tone: dueToday > 0 ? "text-amber-600" : "text-muted-foreground",
+    },
     { label: "Awaiting review", value: inReview, icon: ListChecks, tone: "text-brand-accent" },
     { label: "Approved", value: approvedTotal, icon: CheckCircle2, tone: "text-emerald-600" },
   ];
 
-  const statusData = useMemo(() => [
-    { name: "Pending", value: tasks.filter((t) => t.status === "pending").length, color: "#94a3b8" },
-    { name: "In review", value: tasks.filter((t) => t.status === "completed").length, color: "#3b82f6" },
-    { name: "Approved", value: approvedTotal, color: "#10b981" },
-    { name: "Revision", value: tasks.filter((t) => t.status === "revision").length, color: "#f97316" },
-  ], [tasks, approvedTotal]);
+  const statusData = useMemo(
+    () => [
+      {
+        name: "Pending",
+        value: tasks.filter((t) => t.status === "pending").length,
+        color: "#94a3b8",
+      },
+      {
+        name: "In review",
+        value: tasks.filter((t) => t.status === "completed").length,
+        color: "#3b82f6",
+      },
+      { name: "Approved", value: approvedTotal, color: "#10b981" },
+      {
+        name: "Revision",
+        value: tasks.filter((t) => t.status === "revision").length,
+        color: "#f97316",
+      },
+    ],
+    [tasks, approvedTotal],
+  );
 
   const upcoming = [...open]
     .filter((t) => t.deadline)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
     .slice(0, 5);
 
-  if (loading) return <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>;
+  if (loading)
+    return <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>;
   if (role === "admin") return <Navigate to="/admin" />;
 
   const firstName = profile?.full_name?.split(" ")[0] || "there";
@@ -87,7 +113,9 @@ function UserOverview() {
     <div className="animate-fade-in">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold">{greet}, {firstName}</h1>
+          <h1 className="font-display text-3xl font-bold">
+            {greet}, {firstName}
+          </h1>
           <p className="text-sm text-muted-foreground">Your personal workspace snapshot.</p>
         </div>
         <Link
@@ -105,35 +133,51 @@ function UserOverview() {
               <CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
               <s.icon className={`h-4 w-4 ${s.tone}`} />
             </CardHeader>
-            <CardContent><div className="font-display text-3xl font-bold">{s.value}</div></CardContent>
+            <CardContent>
+              <div className="font-display text-3xl font-bold">{s.value}</div>
+            </CardContent>
           </Card>
         ))}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">Upcoming deadlines</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Upcoming deadlines</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2">
             {upcoming.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">Nothing scheduled — nice work.</div>
-            ) : upcoming.map((t) => (
-              <Link
-                key={t.id}
-                to="/app"
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 transition hover:border-brand-accent/40 hover:bg-muted/60"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{t.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Due {new Date(t.deadline!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                Nothing scheduled — nice work.
+              </div>
+            ) : (
+              upcoming.map((t) => (
+                <Link
+                  key={t.id}
+                  to="/app"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 transition hover:border-brand-accent/40 hover:bg-muted/60"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{t.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Due{" "}
+                      {new Date(t.deadline!).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className={priorityColor(t.priority)}>{t.priority}</Badge>
-                  <Badge variant="outline" className={statusColor(t.status)}>{t.status}</Badge>
-                </div>
-              </Link>
-            ))}
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className={priorityColor(t.priority)}>
+                      {t.priority}
+                    </Badge>
+                    <Badge variant="outline" className={statusColor(t.status)}>
+                      {t.status}
+                    </Badge>
+                  </div>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -145,15 +189,33 @@ function UserOverview() {
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={68} paddingAngle={2} stroke="none">
-                    {statusData.map((s, i) => <Cell key={i} fill={s.color} />)}
+                  <Pie
+                    data={statusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={40}
+                    outerRadius={68}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {statusData.map((s, i) => (
+                      <Cell key={i} fill={s.color} />
+                    ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12, borderRadius: 8 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      fontSize: 12,
+                      borderRadius: 8,
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="text-center text-xs text-muted-foreground">
-              Completion rate: <span className="font-semibold text-foreground">{completionRate}%</span>
+              Completion rate:{" "}
+              <span className="font-semibold text-foreground">{completionRate}%</span>
             </div>
           </CardContent>
         </Card>

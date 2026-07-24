@@ -1,4 +1,25 @@
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchTeam as serverFetchTeam,
+  fetchTasksForAdmin as serverFetchTasksForAdmin,
+  fetchTasksForUser as serverFetchTasksForUser,
+  fetchProofsForTask as serverFetchProofsForTask,
+  fetchSubtasks as serverFetchSubtasks,
+  addSubtask as serverAddSubtask,
+  toggleSubtask as serverToggleSubtask,
+  renameSubtask as serverRenameSubtask,
+  deleteSubtask as serverDeleteSubtask,
+  bulkApproveTasks as serverBulkApproveTasks,
+  bulkDeleteTasks as serverBulkDeleteTasks,
+  bulkReassignTasks as serverBulkReassignTasks,
+  createTask as serverCreateTask,
+  updateTask as serverUpdateTask,
+  deleteTask as serverDeleteTask,
+  updateSubtask,
+  submitTaskProof,
+  fetchTaskComments,
+  addTaskComment,
+  deleteTaskComment,
+} from "./tasks.functions";
 
 export type TaskStatus = "pending" | "completed" | "approved" | "revision";
 export type TaskPriority = "low" | "medium" | "high";
@@ -12,12 +33,12 @@ export interface TaskRow {
   assigned_by: string;
   priority: TaskPriority;
   status: TaskStatus;
-  deadline: string | null;
+  deadline: string | Date | null;
   revision_note: string | null;
-  recurrence: TaskRecurrence;
+  recurrence: string | null;
   tags: string[];
-  created_at: string;
-  updated_at: string;
+  created_at: string | Date;
+  updated_at: string | Date;
 }
 
 export interface TeamMember {
@@ -32,59 +53,35 @@ export interface TeamMember {
 let _teamCache: { at: number; data: TeamMember[] } | null = null;
 const TEAM_TTL_MS = 30_000;
 
-
-
 export async function fetchTeam(force = false): Promise<TeamMember[]> {
   if (!force && _teamCache && Date.now() - _teamCache.at < TEAM_TTL_MS) {
     return _teamCache.data;
   }
-  const [{ data: profiles }, { data: roles }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, position, avatar_url, badge" as any),
-    supabase.from("user_roles").select("user_id, role"),
-  ]);
-  const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
-  const data = ((profiles as any[]) ?? []).map((p) => ({
-    id: p.id,
-    full_name: p.full_name,
-    position: p.position,
-    avatar_url: p.avatar_url,
-    badge: p.badge ?? null,
-    role: (roleMap.get(p.id) ?? "user") as "admin" | "user",
-  }));
-  _teamCache = { at: Date.now(), data };
-  return data;
+  const data = await serverFetchTeam();
+  _teamCache = { at: Date.now(), data: data as any[] };
+  return _teamCache.data;
 }
-
 
 let _adminTasksCache: TaskRow[] | null = null;
 const _userTasksCache = new Map<string, TaskRow[]>();
 
-export function getCachedAdminTasks(): TaskRow[] | null { return _adminTasksCache; }
+export function getCachedAdminTasks(): TaskRow[] | null {
+  return _adminTasksCache;
+}
 export function getCachedUserTasks(userId: string): TaskRow[] | null {
   return _userTasksCache.get(userId) ?? null;
 }
 
 export async function fetchTasksForAdmin(): Promise<TaskRow[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  const rows = (data ?? []) as TaskRow[];
-  _adminTasksCache = rows;
-  return rows;
+  const rows = await serverFetchTasksForAdmin();
+  _adminTasksCache = rows as any[];
+  return _adminTasksCache!;
 }
 
 export async function fetchTasksForUser(userId: string): Promise<TaskRow[]> {
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("assigned_to", userId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  const rows = (data ?? []) as TaskRow[];
-  _userTasksCache.set(userId, rows);
-  return rows;
+  const rows = await serverFetchTasksForUser({ data: userId });
+  _userTasksCache.set(userId, rows as any[]);
+  return rows as any[];
 }
 
 export function getCachedTeam(): TeamMember[] | null {
@@ -92,39 +89,30 @@ export function getCachedTeam(): TeamMember[] | null {
 }
 
 export async function fetchProofsForTask(taskId: string) {
-  const { data, error } = await supabase
-    .from("task_proofs")
-    .select("*")
-    .eq("task_id", taskId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  return await serverFetchProofsForTask({ data: taskId });
 }
 
 export async function signedProofUrl(path: string): Promise<string | null> {
-  const { data } = await supabase.storage.from("task-proofs").createSignedUrl(path, 60 * 30);
-  return data?.signedUrl ?? null;
+  return path;
 }
 
-export function priorityColor(p: TaskPriority) {
+export function priorityColor(p: string) {
   return p === "high"
     ? "bg-red-500/10 text-red-500 border-red-500/20"
     : p === "medium"
-    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-    : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+      ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+      : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
 }
 
-export function statusColor(s: TaskStatus) {
+export function statusColor(s: string) {
   return s === "approved"
     ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
     : s === "completed"
-    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-    : s === "revision"
-    ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
-    : "bg-muted text-muted-foreground border-border";
+      ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+      : s === "revision"
+        ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+        : "bg-muted text-muted-foreground border-border";
 }
-
-// ---------- Subtasks ----------
 
 export interface SubtaskRow {
   id: string;
@@ -132,109 +120,98 @@ export interface SubtaskRow {
   title: string;
   is_done: boolean;
   position: number;
-  created_at: string;
-  updated_at: string;
+  created_at: string | Date;
+  updated_at: string | Date;
 }
 
 export async function fetchSubtasks(taskId: string): Promise<SubtaskRow[]> {
-  const { data, error } = await supabase
-    .from("subtasks" as any)
-    .select("*")
-    .eq("task_id", taskId)
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return ((data ?? []) as unknown) as SubtaskRow[];
+  return (await serverFetchSubtasks({ data: taskId })) as any[];
 }
 
-export async function addSubtask(taskId: string, title: string, position: number): Promise<SubtaskRow> {
-  const { data, error } = await supabase
-    .from("subtasks" as any)
-    .insert({ task_id: taskId, title, position })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return (data as unknown) as SubtaskRow;
+export async function addSubtask(
+  taskId: string,
+  title: string,
+  position: number,
+): Promise<SubtaskRow> {
+  return (await serverAddSubtask({ data: { taskId, title, position } })) as any;
 }
 
 export async function toggleSubtask(id: string, isDone: boolean): Promise<void> {
-  const { error } = await supabase.from("subtasks" as any).update({ is_done: isDone }).eq("id", id);
-  if (error) throw error;
+  await serverToggleSubtask({ data: { id, isDone } });
 }
 
 export async function renameSubtask(id: string, title: string): Promise<void> {
-  const { error } = await supabase.from("subtasks" as any).update({ title }).eq("id", id);
-  if (error) throw error;
+  await serverRenameSubtask({ data: { id, title } });
 }
 
 export async function deleteSubtask(id: string): Promise<void> {
-  const { error } = await supabase.from("subtasks" as any).delete().eq("id", id);
-  if (error) throw error;
+  await serverDeleteSubtask({ data: id });
 }
 
+export async function bulkApproveTasks(ids: string[]) {
+  return await serverBulkApproveTasks({ data: ids });
+}
+
+export async function bulkDeleteTasks(ids: string[]) {
+  return await serverBulkDeleteTasks({ data: ids });
+}
+
+export async function bulkReassignTasks(ids: string[], to: string) {
+  return await serverBulkReassignTasks({ data: { ids, to } });
+}
+
+export async function createTask(data: any) {
+  return await serverCreateTask({ data });
+}
+
+export async function updateTask(id: string, updates: any) {
+  return await serverUpdateTask({ data: { id, updates } });
+}
+
+export async function deleteTask(id: string) {
+  return await serverDeleteTask({ data: id });
+}
+
+// Reminders placeholder
 export interface ReminderRow {
   id: string;
   user_id: string;
   title: string;
-  remind_at: string;
+  remind_at: string | Date;
   notified: boolean;
-  created_at: string;
+  created_at: string | Date;
 }
-
 export async function fetchReminders(): Promise<ReminderRow[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("assigned_to", user.id)
-    .contains("tags", ["reminder"])
-    .order("deadline", { ascending: true });
-  
-  if (error) {
-    console.error("fetchReminders error:", error);
-    return [];
-  }
-  
-  return (data ?? []).map((t: any) => ({
-    id: t.id,
-    user_id: t.assigned_to,
-    title: t.title.replace("Reminder: ", ""),
-    remind_at: t.deadline || new Date().toISOString(),
-    notified: t.status === "completed",
-    created_at: t.created_at,
-  }));
+  return [];
+}
+export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
+  return null;
 }
 
-export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data, error } = await supabase
-    .from("tasks")
-    .insert({ 
-      title: `Reminder: ${title}`, 
-      assigned_to: user.id, 
-      assigned_by: user.id,
-      deadline: remindAt.toISOString(),
-      priority: "medium",
-      status: "pending",
-      recurrence: "none",
-      tags: ["reminder"]
-    })
-    .select("*")
-    .single();
-    
-  if (error) {
-    console.error("addReminder error:", error);
-    throw error;
-  }
-  
-  return {
-    id: data.id,
-    user_id: data.assigned_to,
-    title: data.title.replace("Reminder: ", ""),
-    remind_at: data.deadline || new Date().toISOString(),
-    notified: false,
-    created_at: data.created_at,
-  };
+import {
+  submitTaskProof as serverSubmitTaskProof,
+  fetchTaskComments as serverFetchTaskComments,
+  addTaskComment as serverAddTaskComment,
+  deleteTaskComment as serverDeleteTaskComment,
+} from "./tasks.functions";
+
+export async function submitTaskProof(
+  taskId: string,
+  fileBase64: string,
+  fileName: string,
+  note: string | null,
+) {
+  return await serverSubmitTaskProof({ data: { taskId, fileBase64, fileName, note } });
+}
+
+export async function fetchTaskComments(taskId: string) {
+  return await serverFetchTaskComments({ data: taskId });
+}
+
+export async function addTaskComment(taskId: string, body: string) {
+  return await serverAddTaskComment({ data: { taskId, body } });
+}
+
+export async function deleteTaskComment(id: string) {
+  return await serverDeleteTaskComment({ data: id });
 }

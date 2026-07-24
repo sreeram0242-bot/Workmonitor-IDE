@@ -3,9 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { Sparkles, Radio, Zap, Terminal, Users2, ListChecks, MessageSquare, PartyPopper, Ghost, Loader2 } from "lucide-react";
+import { fetchDevStats } from "@/lib/admin.functions";
+import {
+  Sparkles,
+  Radio,
+  Zap,
+  Terminal,
+  Users2,
+  ListChecks,
+  MessageSquare,
+  PartyPopper,
+  Ghost,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dev")({
@@ -39,24 +50,23 @@ function DevConsole() {
   useEffect(() => {
     if (!isDev || !user) return;
     (async () => {
-      const [u, t, m, a] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("tasks").select("id", { count: "exact", head: true }),
-        supabase.from("messages").select("id", { count: "exact", head: true }),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "approved"),
-      ]);
-      setStats({ users: u.count ?? 0, tasks: t.count ?? 0, messages: m.count ?? 0, approved: a.count ?? 0 });
+      try {
+        const data = await fetchDevStats();
+        setStats(data);
+      } catch (e) {
+        console.error(e);
+      }
     })();
 
     const syncPresence = (rows: Presence[]) => {
       setOnline(rows.sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")));
     };
     syncPresence(((window as any).__workmonitorPresence ?? []) as Presence[]);
-    const onPresence = (event: Event) => syncPresence(((event as CustomEvent<Presence[]>).detail ?? []) as Presence[]);
+    const onPresence = (event: Event) =>
+      syncPresence(((event as CustomEvent<Presence[]>).detail ?? []) as Presence[]);
     window.addEventListener("workmonitor-presence", onPresence);
     pushLog("Live presence stream connected");
     return () => window.removeEventListener("workmonitor-presence", onPresence);
-
   }, [isDev, user?.id]);
 
   function pushLog(line: string) {
@@ -66,23 +76,18 @@ function DevConsole() {
   async function sendBroadcast(kind: "toast" | "confetti") {
     if (kind === "toast" && !broadcastMsg.trim()) return;
     setSending(true);
-    // Root listener subscribes on channel "app-presence" for broadcast events.
-    const ch = supabase.channel("app-presence");
-    await new Promise<void>((resolve) => {
-      ch.subscribe((s) => { if (s === "SUBSCRIBED") resolve(); });
-    });
-    const payload = kind === "toast"
-      ? { message: broadcastMsg.trim(), from: profile?.full_name ?? "Developer" }
-      : { from: profile?.full_name ?? "Developer" };
-    await ch.send({ type: "broadcast", event: kind, payload });
-    supabase.removeChannel(ch);
-    pushLog(kind === "toast" ? `Broadcast toast: "${broadcastMsg.trim()}"` : "Confetti storm launched");
-    if (kind === "toast") setBroadcastMsg("");
-    setSending(false);
-    toast.success(kind === "toast" ? "Broadcast sent to everyone" : "Confetti launched everywhere");
+    // Broadcast disabled for polling MVP
+    setTimeout(() => {
+      pushLog(
+        kind === "toast"
+          ? `Broadcast toast: "${broadcastMsg.trim()}" (disabled)`
+          : "Confetti storm launched (disabled)",
+      );
+      if (kind === "toast") setBroadcastMsg("");
+      setSending(false);
+      toast.success(kind === "toast" ? "Broadcast sent (mock)" : "Confetti launched (mock)");
+    }, 500);
   }
-
-
 
   function toggleGhost() {
     const next = !ghost;
@@ -98,7 +103,12 @@ function DevConsole() {
 
   const uptime = useMemo(() => new Date().toLocaleString(), []);
 
-  if (loading) return <div className="py-16 text-center text-sm text-muted-foreground"><Loader2 className="inline h-4 w-4 animate-spin" /></div>;
+  if (loading)
+    return (
+      <div className="py-16 text-center text-sm text-muted-foreground">
+        <Loader2 className="inline h-4 w-4 animate-spin" />
+      </div>
+    );
   if (!isDev) return <Navigate to="/" />;
 
   return (
@@ -112,7 +122,9 @@ function DevConsole() {
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/70">
               <Terminal className="h-3.5 w-3.5" /> Developer Console
             </div>
-            <h1 className="mt-2 font-display text-3xl font-bold">Welcome, {profile?.full_name?.split(" ")[0]}</h1>
+            <h1 className="mt-2 font-display text-3xl font-bold">
+              Welcome, {profile?.full_name?.split(" ")[0]}
+            </h1>
             <p className="mt-1 text-sm text-white/80">Restricted zone. Session opened {uptime}.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -136,7 +148,9 @@ function DevConsole() {
               <CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
               <s.icon className="h-4 w-4 text-brand-accent" />
             </CardHeader>
-            <CardContent><div className="font-display text-3xl font-bold">{s.value}</div></CardContent>
+            <CardContent>
+              <div className="font-display text-3xl font-bold">{s.value}</div>
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -145,7 +159,9 @@ function DevConsole() {
         {/* Broadcast */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><Radio className="h-4 w-4 text-brand-accent" /> Global broadcast</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Radio className="h-4 w-4 text-brand-accent" /> Global broadcast
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Textarea
@@ -156,17 +172,30 @@ function DevConsole() {
               maxLength={240}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={() => sendBroadcast("toast")} disabled={sending || !broadcastMsg.trim()}>
+              <Button
+                onClick={() => sendBroadcast("toast")}
+                disabled={sending || !broadcastMsg.trim()}
+              >
                 <Zap className="mr-2 h-4 w-4" /> Send to everyone
               </Button>
-              <Button variant="outline" onClick={() => sendBroadcast("confetti")} disabled={sending}>
+              <Button
+                variant="outline"
+                onClick={() => sendBroadcast("confetti")}
+                disabled={sending}
+              >
                 <PartyPopper className="mr-2 h-4 w-4" /> Confetti storm
               </Button>
-              <Button variant="ghost" onClick={toggleGhost} className={ghost ? "text-brand-accent" : ""}>
+              <Button
+                variant="ghost"
+                onClick={toggleGhost}
+                className={ghost ? "text-brand-accent" : ""}
+              >
                 <Ghost className="mr-2 h-4 w-4" /> Ghost mode {ghost ? "on" : "off"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Broadcasts appear as toasts on every open browser tab in real time.</p>
+            <p className="text-xs text-muted-foreground">
+              Broadcasts appear as toasts on every open browser tab in real time.
+            </p>
           </CardContent>
         </Card>
 
@@ -177,11 +206,16 @@ function DevConsole() {
           </CardHeader>
           <CardContent>
             {online.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">No one else here.</div>
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No one else here.
+              </div>
             ) : (
               <ul className="space-y-2">
                 {online.map((p) => (
-                  <li key={p.user_id + p.at} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
+                  <li
+                    key={p.user_id + p.at}
+                    className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm"
+                  >
                     <span className="flex items-center gap-2">
                       <span className="relative flex h-2 w-2">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -201,11 +235,13 @@ function DevConsole() {
       {/* Log */}
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Terminal className="h-4 w-4" /> Console log</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Terminal className="h-4 w-4" /> Console log
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <pre className="max-h-64 overflow-auto rounded-md bg-[oklch(0.15_0.02_265)] p-3 font-mono text-[11px] leading-relaxed text-emerald-300">
-{log.length === 0 ? "// idle" : log.join("\n")}
+            {log.length === 0 ? "// idle" : log.join("\n")}
           </pre>
         </CardContent>
       </Card>

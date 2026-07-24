@@ -1,4 +1,33 @@
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchMyConversations as serverFetchMyConversations,
+  fetchConversationMembers as serverFetchConversationMembers,
+  fetchMessages as serverFetchMessages,
+  fetchOlderMessages as serverFetchOlderMessages,
+  fetchMessagesByIds as serverFetchMessagesByIds,
+  sendMessage as serverSendMessage,
+  uploadChatAttachment as serverUploadChatAttachment,
+  findOrCreateDM as serverFindOrCreateDM,
+  createGroup as serverCreateGroup,
+  editMessage as serverEditMessage,
+  deleteMessage as serverDeleteMessage,
+  deleteMessageForMe as serverDeleteMessageForMe,
+  leaveConversation as serverLeaveConversation,
+  toggleMuteConversation as serverToggleMuteConversation,
+  fetchMuteMap as serverFetchMuteMap,
+  togglePinMessage as serverTogglePinMessage,
+  fetchPinnedMessages as serverFetchPinnedMessages,
+  fetchReactions as serverFetchReactions,
+  toggleReaction as serverToggleReaction,
+  fetchStarredIds as serverFetchStarredIds,
+  toggleStar as serverToggleStar,
+  markConversationRead as serverMarkConversationRead,
+  fetchLastReadMap as serverFetchLastReadMap,
+  fetchLastReadByMembers as serverFetchLastReadByMembers,
+  fetchUnreadCounts as serverFetchUnreadCounts,
+  renameGroup as serverRenameGroup,
+  addGroupMembers as serverAddGroupMembers,
+  removeGroupMember as serverRemoveGroupMember,
+} from "./chat.functions";
 
 export interface Conversation {
   id: string;
@@ -41,56 +70,32 @@ export interface Reaction {
 }
 
 export async function fetchMyConversations(userId: string): Promise<Conversation[]> {
-  const { data: memberships } = await supabase
-    .from("conversation_members")
-    .select("conversation_id")
-    .eq("user_id", userId);
-  const ids = (memberships ?? []).map((m) => m.conversation_id);
-  if (ids.length === 0) return [];
-  const { data } = await supabase
-    .from("conversations")
-    .select("*")
-    .in("id", ids)
-    .order("created_at", { ascending: false });
-  return (data ?? []) as Conversation[];
+  return (await serverFetchMyConversations()) as any;
 }
 
 export async function fetchConversationMembers(conversationId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from("conversation_members")
-    .select("user_id")
-    .eq("conversation_id", conversationId);
-  return (data ?? []).map((r) => r.user_id);
+  return await serverFetchConversationMembers({ data: conversationId });
 }
 
 export const MESSAGES_PAGE_SIZE = 50;
 
-export async function fetchMessages(conversationId: string, limit = MESSAGES_PAGE_SIZE): Promise<Message[]> {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return ((data ?? []) as unknown as Message[]).slice().reverse();
+export async function fetchMessages(
+  conversationId: string,
+  limit = MESSAGES_PAGE_SIZE,
+): Promise<Message[]> {
+  return (await serverFetchMessages({ data: { conversationId, limit } })) as any;
 }
 
-export async function fetchOlderMessages(conversationId: string, beforeIso: string, limit = MESSAGES_PAGE_SIZE): Promise<Message[]> {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .lt("created_at", beforeIso)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return ((data ?? []) as unknown as Message[]).slice().reverse();
+export async function fetchOlderMessages(
+  conversationId: string,
+  beforeIso: string,
+  limit = MESSAGES_PAGE_SIZE,
+): Promise<Message[]> {
+  return (await serverFetchOlderMessages({ data: { conversationId, beforeIso, limit } })) as any;
 }
-
 
 export async function fetchMessagesByIds(ids: string[]): Promise<Message[]> {
-  if (ids.length === 0) return [];
-  const { data } = await supabase.from("messages").select("*").in("id", ids);
-  return ((data ?? []) as unknown as Message[]);
+  return (await serverFetchMessagesByIds({ data: ids })) as any;
 }
 
 export async function sendMessage(
@@ -100,50 +105,16 @@ export async function sendMessage(
   attachments: ChatAttachment[] = [],
   extras: { reply_to?: string | null; forwarded_from?: string | null; mentions?: string[] } = {},
 ) {
-  const payload: Record<string, unknown> = {
-    conversation_id: conversationId,
-    sender_id: senderId,
-    content,
-    attachments: attachments as unknown as never,
-  };
-  if (extras.reply_to) payload.reply_to = extras.reply_to;
-  if (extras.forwarded_from) payload.forwarded_from = extras.forwarded_from;
-  if (extras.mentions && extras.mentions.length > 0) payload.mentions = extras.mentions;
-  const { error } = await supabase.from("messages").insert(payload as never);
-  if (error) throw error;
-
-  try {
-    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-    const apiKey = import.meta.env.VITE_ONESIGNAL_API_KEY;
-    if (appId && apiKey) {
-      const members = await fetchConversationMembers(conversationId);
-      const targetIds = members.filter(id => id !== senderId);
-
-      if (targetIds.length > 0) {
-        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", senderId).maybeSingle();
-        const senderName = profile?.full_name || "Someone";
-        
-        await fetch("https://onesignal.com/api/v1/notifications", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Basic ${apiKey}`,
-          },
-          body: JSON.stringify({
-            app_id: appId,
-            include_aliases: {
-              external_id: targetIds
-            },
-            target_channel: "push",
-            headings: { en: senderName },
-            contents: { en: content || "Sent an attachment" },
-          }),
-        });
-      }
-    }
-  } catch (err) {
-    console.error("Failed to send push notification", err);
-  }
+  await serverSendMessage({
+    data: {
+      conversationId,
+      content,
+      attachments,
+      replyTo: extras.reply_to,
+      forwardedFrom: extras.forwarded_from,
+      mentions: extras.mentions,
+    },
+  });
 }
 
 function attachmentKind(mime: string): "image" | "video" | "file" | "audio" {
@@ -158,54 +129,20 @@ export async function uploadChatAttachment(
   userId: string,
   file: File,
 ): Promise<ChatAttachment> {
-  const extPart = file.name.includes(".") ? file.name.split(".").pop() : "";
-  const path = `${conversationId}/${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${extPart ? "." + extPart : ""}`;
-  const { error } = await supabase.storage.from("chat-attachments").upload(path, file, {
-    contentType: file.type || "application/octet-stream",
-    upsert: false,
-  });
-  if (error) throw error;
-  const { data: signed } = await supabase.storage
-    .from("chat-attachments")
-    .createSignedUrl(path, 60 * 60 * 24 * 7);
-  return {
-    path,
-    url: signed?.signedUrl ?? "",
-    name: file.name,
-    type: file.type || "application/octet-stream",
-    size: file.size,
-    kind: attachmentKind(file.type || ""),
-  };
+  const buffer = await file.arrayBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+  return (await serverUploadChatAttachment({
+    data: {
+      conversationId,
+      fileBase64: base64,
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+    },
+  })) as any;
 }
 
 export async function findOrCreateDM(currentUserId: string, otherUserId: string): Promise<string> {
-  const { data: mine } = await supabase
-    .from("conversation_members")
-    .select("conversation_id, conversations!inner(id, is_group)")
-    .eq("user_id", currentUserId);
-  const dmIds = (mine ?? [])
-    .filter((r: any) => r.conversations?.is_group === false)
-    .map((r: any) => r.conversation_id);
-  if (dmIds.length > 0) {
-    const { data: match } = await supabase
-      .from("conversation_members")
-      .select("conversation_id")
-      .in("conversation_id", dmIds)
-      .eq("user_id", otherUserId)
-      .maybeSingle();
-    if (match?.conversation_id) return match.conversation_id;
-  }
-  const { data: conv, error } = await supabase
-    .from("conversations")
-    .insert({ is_group: false, name: null })
-    .select("id")
-    .single();
-  if (error || !conv) throw error ?? new Error("Failed to create conversation");
-  await supabase.from("conversation_members").insert([
-    { conversation_id: conv.id, user_id: currentUserId },
-    { conversation_id: conv.id, user_id: otherUserId },
-  ]);
-  return conv.id;
+  return await serverFindOrCreateDM({ data: otherUserId });
 }
 
 export async function createGroup(
@@ -213,149 +150,75 @@ export async function createGroup(
   name: string,
   memberIds: string[],
 ): Promise<string> {
-  const { data: conv, error } = await supabase
-    .from("conversations")
-    .insert({ is_group: true, name })
-    .select("id")
-    .single();
-  if (error || !conv) throw error ?? new Error("Failed to create group");
-  const ids = Array.from(new Set([currentUserId, ...memberIds]));
-  await supabase
-    .from("conversation_members")
-    .insert(ids.map((id) => ({ conversation_id: conv.id, user_id: id })));
-  return conv.id;
+  return await serverCreateGroup({ data: { name, memberIds } });
 }
 
 export async function editMessage(messageId: string, content: string) {
-  const { error } = await supabase
-    .from("messages")
-    .update({ content, edited_at: new Date().toISOString() })
-    .eq("id", messageId);
-  if (error) throw error;
+  await serverEditMessage({ data: { messageId, content } });
 }
 
 export async function deleteMessage(messageId: string) {
-  const { error } = await supabase
-    .from("messages")
-    .update({ content: "", attachments: [] as unknown as never, deleted_at: new Date().toISOString() })
-    .eq("id", messageId);
-  if (error) throw error;
+  await serverDeleteMessage({ data: messageId });
 }
 
 // Delete-for-me: hides just for the current user via RPC.
 export async function deleteMessageForMe(messageId: string) {
-  const { error } = await supabase.rpc("hide_message_for_me" as never, { _message_id: messageId } as never);
-  if (error) throw error;
+  await serverDeleteMessageForMe({ data: messageId });
 }
 
 export async function leaveConversation(conversationId: string) {
-  const { error } = await supabase.rpc("leave_conversation" as never, { _conv: conversationId } as never);
-  if (error) throw error;
+  await serverLeaveConversation({ data: conversationId });
 }
 
 export async function toggleMuteConversation(conversationId: string, mute: boolean) {
-  const { error } = await supabase.rpc("toggle_mute_conversation" as never, { _conv: conversationId, _mute: mute } as never);
-  if (error) throw error;
+  await serverToggleMuteConversation({ data: { conversationId, mute } });
 }
 
 export async function fetchMuteMap(userId: string): Promise<Record<string, boolean>> {
-  const { data } = await supabase
-    .from("conversation_members")
-    .select("conversation_id, muted_at")
-    .eq("user_id", userId);
-  const map: Record<string, boolean> = {};
-  for (const r of (data ?? []) as any[]) map[r.conversation_id] = Boolean(r.muted_at);
-  return map;
+  return await serverFetchMuteMap();
 }
 
-
 export async function togglePinMessage(messageId: string, userId: string, pinned: boolean) {
-  const { error } = await supabase
-    .from("messages")
-    .update({
-      pinned_at: pinned ? new Date().toISOString() : null,
-      pinned_by: pinned ? userId : null,
-    })
-    .eq("id", messageId);
-  if (error) throw error;
+  await serverTogglePinMessage({ data: { messageId, pinned } });
 }
 
 export async function fetchPinnedMessages(conversationId: string): Promise<Message[]> {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .not("pinned_at", "is", null)
-    .order("pinned_at", { ascending: false });
-  return ((data ?? []) as unknown as Message[]);
+  return (await serverFetchPinnedMessages({ data: conversationId })) as any;
 }
 
 export async function fetchReactions(conversationId: string): Promise<Reaction[]> {
-  // fetch reactions for all messages in the conversation
-  const { data: msgs } = await supabase
-    .from("messages")
-    .select("id")
-    .eq("conversation_id", conversationId);
-  const ids = (msgs ?? []).map((m: any) => m.id);
-  if (ids.length === 0) return [];
-  const { data } = await supabase.from("message_reactions").select("*").in("message_id", ids);
-  return (data ?? []) as Reaction[];
+  return (await serverFetchReactions({ data: conversationId })) as any;
 }
 
-export async function toggleReaction(messageId: string, userId: string, emoji: string, has: boolean) {
-  if (has) {
-    await supabase
-      .from("message_reactions")
-      .delete()
-      .eq("message_id", messageId)
-      .eq("user_id", userId)
-      .eq("emoji", emoji);
-  } else {
-    await supabase
-      .from("message_reactions")
-      .insert({ message_id: messageId, user_id: userId, emoji });
-  }
+export async function toggleReaction(
+  messageId: string,
+  userId: string,
+  emoji: string,
+  has: boolean,
+) {
+  await serverToggleReaction({ data: { messageId, emoji, has } });
 }
 
 export async function fetchStarredIds(userId: string): Promise<string[]> {
-  const { data } = await supabase.from("starred_messages").select("message_id").eq("user_id", userId);
-  return (data ?? []).map((r: any) => r.message_id);
+  return await serverFetchStarredIds();
 }
 
 export async function toggleStar(messageId: string, userId: string, starred: boolean) {
-  if (starred) {
-    await supabase.from("starred_messages").delete().eq("message_id", messageId).eq("user_id", userId);
-  } else {
-    await supabase.from("starred_messages").insert({ message_id: messageId, user_id: userId });
-  }
+  await serverToggleStar({ data: { messageId, starred } });
 }
 
 export async function markConversationRead(conversationId: string, userId: string) {
-  await supabase
-    .from("conversation_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("conversation_id", conversationId)
-    .eq("user_id", userId);
+  await serverMarkConversationRead({ data: conversationId });
 }
 
 export async function fetchLastReadMap(userId: string): Promise<Record<string, string>> {
-  const { data } = await supabase
-    .from("conversation_members")
-    .select("conversation_id, last_read_at")
-    .eq("user_id", userId);
-  const map: Record<string, string> = {};
-  for (const r of data ?? []) map[(r as any).conversation_id] = (r as any).last_read_at;
-  return map;
+  return await serverFetchLastReadMap();
 }
 
-export async function fetchLastReadByMembers(conversationId: string): Promise<Record<string, string>> {
-  const { data } = await supabase
-    .from("conversation_members")
-    .select("user_id, last_read_at")
-    .eq("conversation_id", conversationId);
-  const map: Record<string, string> = {};
-  for (const r of data ?? []) map[(r as any).user_id] = (r as any).last_read_at;
-  return map;
+export async function fetchLastReadByMembers(
+  conversationId: string,
+): Promise<Record<string, string>> {
+  return await serverFetchLastReadByMembers({ data: conversationId });
 }
 
 export async function fetchUnreadCounts(
@@ -363,49 +226,23 @@ export async function fetchUnreadCounts(
   conversationIds: string[],
   lastRead: Record<string, string>,
 ): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
-  await Promise.all(
-    conversationIds.map(async (cid) => {
-      const since = lastRead[cid] ?? new Date(0).toISOString();
-      const { count } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", cid)
-        .neq("sender_id", userId)
-        .gt("created_at", since);
-      result[cid] = count ?? 0;
-    }),
-  );
-  return result;
+  return await serverFetchUnreadCounts({ data: { conversationIds, lastRead } });
 }
 
 export async function renameGroup(conversationId: string, name: string) {
-  const { error } = await supabase.from("conversations").update({ name }).eq("id", conversationId);
-  if (error) throw error;
+  await serverRenameGroup({ data: { conversationId, name } });
 }
 
 export async function addGroupMembers(conversationId: string, userIds: string[]) {
-  if (userIds.length === 0) return;
-  const { error } = await supabase
-    .from("conversation_members")
-    .insert(userIds.map((user_id) => ({ conversation_id: conversationId, user_id })));
-  if (error) throw error;
+  await serverAddGroupMembers({ data: { conversationId, userIds } });
 }
 
 export async function removeGroupMember(conversationId: string, userId: string) {
-  const { error } = await supabase
-    .from("conversation_members")
-    .delete()
-    .eq("conversation_id", conversationId)
-    .eq("user_id", userId);
-  if (error) throw error;
+  await serverRemoveGroupMember({ data: { conversationId, userId } });
 }
 
 // Parse @Firstname / @FullName mentions from text; return matched user ids.
-export function extractMentions(
-  text: string,
-  team: { id: string; full_name: string }[],
-): string[] {
+export function extractMentions(text: string, team: { id: string; full_name: string }[]): string[] {
   const found = new Set<string>();
   const re = /@([\p{L}][\p{L}0-9._-]{1,40})/gu;
   let m: RegExpExecArray | null;
@@ -414,7 +251,10 @@ export function extractMentions(
     for (const t of team) {
       const first = (t.full_name.split(" ")[0] ?? "").toLowerCase();
       const full = t.full_name.toLowerCase().replace(/\s+/g, "");
-      if (token === first || token === full) { found.add(t.id); break; }
+      if (token === first || token === full) {
+        found.add(t.id);
+        break;
+      }
     }
   }
   return Array.from(found);
@@ -429,19 +269,22 @@ export function extractFirstUrl(text: string): string | null {
 // Developer-only message effects. Encoded as a `[[fx:name]] ` prefix in content
 // so no schema change is needed. Rendering strips the marker and adds a class.
 export const MESSAGE_EFFECTS = [
-  { id: "fire",     label: "Fire",     icon: "🔥" },
-  { id: "hearts",   label: "Hearts",   icon: "❤️" },
+  { id: "fire", label: "Fire", icon: "🔥" },
+  { id: "hearts", label: "Hearts", icon: "❤️" },
   { id: "confetti", label: "Confetti", icon: "🎉" },
-  { id: "sparkles", label: "Sparkle",  icon: "✨" },
-  { id: "neon",     label: "Neon",     icon: "💡" },
-  { id: "shake",    label: "Shake",    icon: "💥" },
-  { id: "rainbow",  label: "Rainbow",  icon: "🌈" },
-  { id: "snow",     label: "Snow",     icon: "❄️" },
+  { id: "sparkles", label: "Sparkle", icon: "✨" },
+  { id: "neon", label: "Neon", icon: "💡" },
+  { id: "shake", label: "Shake", icon: "💥" },
+  { id: "rainbow", label: "Rainbow", icon: "🌈" },
+  { id: "snow", label: "Snow", icon: "❄️" },
 ] as const;
-export type MessageEffect = typeof MESSAGE_EFFECTS[number]["id"];
+export type MessageEffect = (typeof MESSAGE_EFFECTS)[number]["id"];
 
 const FX_RE = /^\[\[fx:([a-z]+)\]\]\s*/;
-export function parseEffect(content: string | null | undefined): { effect: MessageEffect | null; text: string } {
+export function parseEffect(content: string | null | undefined): {
+  effect: MessageEffect | null;
+  text: string;
+} {
   if (!content) return { effect: null, text: content ?? "" };
   const m = content.match(FX_RE);
   if (!m) return { effect: null, text: content };
@@ -453,4 +296,3 @@ export function parseEffect(content: string | null | undefined): { effect: Messa
 export function encodeEffect(effect: MessageEffect | null, text: string): string {
   return effect ? `[[fx:${effect}]] ${text}` : text;
 }
-

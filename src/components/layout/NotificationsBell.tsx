@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, CheckCheck, Trash2, ListChecks, MessageSquare, UserPlus, AlertCircle } from "lucide-react";
+import {
+  Bell,
+  CheckCheck,
+  Trash2,
+  ListChecks,
+  MessageSquare,
+  UserPlus,
+  AlertCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,8 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { fetchNotifications, markNotificationsRead, clearNotifications } from "@/lib/notify";
 
 interface NotificationRow {
   id: string;
@@ -37,8 +45,10 @@ function relTime(iso: string): string {
 function typeIcon(type: string) {
   const t = type.toLowerCase();
   if (t.includes("task")) return <ListChecks className="h-3.5 w-3.5 text-brand" />;
-  if (t.includes("message") || t.includes("chat") || t.includes("mention")) return <MessageSquare className="h-3.5 w-3.5 text-brand-accent" />;
-  if (t.includes("member") || t.includes("group") || t.includes("invite")) return <UserPlus className="h-3.5 w-3.5 text-emerald-600" />;
+  if (t.includes("message") || t.includes("chat") || t.includes("mention"))
+    return <MessageSquare className="h-3.5 w-3.5 text-brand-accent" />;
+  if (t.includes("member") || t.includes("group") || t.includes("invite"))
+    return <UserPlus className="h-3.5 w-3.5 text-emerald-600" />;
   return <AlertCircle className="h-3.5 w-3.5 text-amber-600" />;
 }
 
@@ -51,27 +61,19 @@ export function NotificationsBell() {
 
   async function reload() {
     if (!user) return;
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setItems((data ?? []) as NotificationRow[]);
+    try {
+      const data = (await fetchNotifications()) as any[];
+      setItems(data);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   useEffect(() => {
     if (!user) return;
     reload();
-    const ch = supabase
-      .channel(`notif-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        () => reload(),
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const id = setInterval(reload, 5000); // Poll every 5s
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -83,24 +85,39 @@ export function NotificationsBell() {
   }, [open]);
 
   const unread = items.filter((i) => !i.read).length;
-  const visible = useMemo(() => tab === "unread" ? items.filter((i) => !i.read) : items, [items, tab]);
+  const visible = useMemo(
+    () => (tab === "unread" ? items.filter((i) => !i.read) : items),
+    [items, tab],
+  );
 
   async function markAllRead() {
     if (!user || unread === 0) return;
     setItems((prev) => prev.map((i) => ({ ...i, read: true })));
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    try {
+      await markNotificationsRead({});
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function clearAll() {
     if (!user || items.length === 0) return;
     setItems([]);
-    await supabase.from("notifications").delete().eq("user_id", user.id);
+    try {
+      await clearNotifications();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function openItem(item: NotificationRow) {
     if (!item.read) {
-      setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, read: true } : i));
-      await supabase.from("notifications").update({ read: true }).eq("id", item.id);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, read: true } : i)));
+      try {
+        await markNotificationsRead({ data: { id: item.id } });
+      } catch (e) {
+        console.error(e);
+      }
     }
     if (item.link) {
       setOpen(false);
@@ -111,7 +128,12 @@ export function NotificationsBell() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`} className="relative">
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label={`Notifications${unread > 0 ? `, ${unread} unread` : ""}`}
+          className="relative"
+        >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
@@ -125,7 +147,9 @@ export function NotificationsBell() {
           <div className="flex items-center gap-2">
             <div className="text-sm font-semibold">Notifications</div>
             {unread > 0 && (
-              <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">{unread} new</span>
+              <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
+                {unread} new
+              </span>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -135,7 +159,13 @@ export function NotificationsBell() {
               </Button>
             )}
             {items.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={clearAll} className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive" aria-label="Clear all notifications">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearAll}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                aria-label="Clear all notifications"
+              >
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
@@ -173,15 +203,24 @@ export function NotificationsBell() {
                       {typeIcon(n.type)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className={`text-sm leading-snug ${!n.read ? "font-medium text-foreground" : "text-foreground/80"}`}>
+                      <div
+                        className={`text-sm leading-snug ${!n.read ? "font-medium text-foreground" : "text-foreground/80"}`}
+                      >
                         {n.message}
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <span title={new Date(n.created_at).toLocaleString()}>{relTime(n.created_at)}</span>
+                        <span title={new Date(n.created_at).toLocaleString()}>
+                          {relTime(n.created_at)}
+                        </span>
                         {n.link && <span className="text-brand-accent">· Open</span>}
                       </div>
                     </div>
-                    {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-accent" aria-label="Unread" />}
+                    {!n.read && (
+                      <span
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-accent"
+                        aria-label="Unread"
+                      />
+                    )}
                   </div>
                 </button>
               ))}

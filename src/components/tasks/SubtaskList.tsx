@@ -15,9 +15,9 @@ import { toast } from "sonner";
 
 interface Props {
   taskId: string;
-  canEdit: boolean;   // admin can add/rename/delete
+  canEdit: boolean; // admin can add/rename/delete
   canToggle: boolean; // assignee or admin can tick
-  compact?: boolean;  // read-only progress summary on cards
+  compact?: boolean; // read-only progress summary on cards
 }
 
 export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
@@ -38,7 +38,9 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [taskId]);
 
   async function onAdd() {
@@ -59,14 +61,18 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
 
   async function onToggle(id: string, v: boolean) {
     setItems((prev) => prev.map((s) => (s.id === id ? { ...s, is_done: v } : s)));
-    try { await toggleSubtask(id, v); } catch (e: unknown) {
+    try {
+      await toggleSubtask(id, v);
+    } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed");
       setItems((prev) => prev.map((s) => (s.id === id ? { ...s, is_done: !v } : s)));
     }
   }
 
   async function onRename(id: string, title: string) {
-    try { await renameSubtask(id, title); } catch (e: unknown) {
+    try {
+      await renameSubtask(id, title);
+    } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   }
@@ -74,7 +80,9 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
   async function onDelete(id: string) {
     const prev = items;
     setItems((p) => p.filter((s) => s.id !== id));
-    try { await deleteSubtask(id); } catch (e: unknown) {
+    try {
+      await deleteSubtask(id);
+    } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed");
       setItems(prev);
     }
@@ -90,7 +98,9 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
       <div className="mt-2">
         <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
           <ListChecks className="h-3 w-3" />
-          <span>{done}/{total} subtasks</span>
+          <span>
+            {done}/{total} subtasks
+          </span>
           <span className="ml-auto">{pct}%</span>
         </div>
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -105,7 +115,11 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <ListChecks className="h-3.5 w-3.5" />
         <span>Checklist</span>
-        {total > 0 && <span className="ml-auto">{done}/{total} · {pct}%</span>}
+        {total > 0 && (
+          <span className="ml-auto">
+            {done}/{total} · {pct}%
+          </span>
+        )}
       </div>
       {total > 0 && (
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
@@ -119,7 +133,10 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
       ) : (
         <ul className="space-y-1.5">
           {items.map((s) => (
-            <li key={s.id} className="flex items-center gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5">
+            <li
+              key={s.id}
+              className="flex items-center gap-2 rounded-md border border-border bg-background/60 px-2 py-1.5"
+            >
               <Checkbox
                 checked={s.is_done}
                 disabled={!canToggle && !canEdit}
@@ -135,10 +152,19 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
                   }}
                 />
               ) : (
-                <span className={`flex-1 text-sm ${s.is_done ? "text-muted-foreground line-through" : ""}`}>{s.title}</span>
+                <span
+                  className={`flex-1 text-sm ${s.is_done ? "text-muted-foreground line-through" : ""}`}
+                >
+                  {s.title}
+                </span>
               )}
               {canEdit && (
-                <Button size="sm" variant="ghost" onClick={() => onDelete(s.id)} className="h-7 w-7 p-0 text-red-600 hover:text-red-700">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onDelete(s.id)}
+                  className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               )}
@@ -151,12 +177,21 @@ export function SubtaskList({ taskId, canEdit, canToggle, compact }: Props) {
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onAdd(); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onAdd();
+              }
+            }}
             placeholder="Add a subtask…"
             className="h-8 text-sm"
           />
           <Button size="sm" onClick={onAdd} disabled={adding || !newTitle.trim()}>
-            {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            {adding ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
       )}

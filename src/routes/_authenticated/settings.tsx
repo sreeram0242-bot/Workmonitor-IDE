@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Camera, Loader2, Lock, Bell, Eye, LogOut } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useNavigate } from "@tanstack/react-router";
+import { UserProfile, useClerk } from "@clerk/tanstack-start";
+import {
+  updateProfile,
+  checkPasscode,
+  verifyPasscode,
+  updatePasscode,
+} from "@/lib/settings.functions";
+import { put } from "@vercel/blob";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -28,7 +32,11 @@ function SettingsPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const initials = (profile?.full_name || user?.email || "?")
-    .split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -44,17 +52,14 @@ function SettingsPage() {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop() || "jpg";
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
-        upsert: true, contentType: file.type,
-      });
-      if (upErr) throw upErr;
-      const { data: signed } = await supabase.storage.from("avatars").createSignedUrl(path, 60 * 60 * 24 * 365);
-      const url = signed?.signedUrl ?? path;
-      const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
-      if (dbErr) throw dbErr;
-      setAvatarUrl(url);
-      toast.success("Profile photo updated");
+      const path = `avatars/${user.id}-${Date.now()}.${ext}`;
+
+      // We will upload to Vercel Blob using the SDK
+      // The API route for this needs to be set up, but for now we'll do it on the client
+      // actually Vercel Blob requires a server token, so we shouldn't do it directly on the client without a token.
+      // Clerk handles avatars out of the box! We don't even need to upload to Vercel Blob.
+      // But just to keep the old UI working, I'll show a toast.
+      toast.info("Avatar changes should be done via Clerk Account settings below.");
     } catch (err: any) {
       toast.error(err.message ?? "Upload failed");
     } finally {
@@ -67,11 +72,17 @@ function SettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">Update your profile photo. Other details are managed by admins.</p>
+        <p className="text-sm text-muted-foreground">
+          Update your profile photo. Other details are managed by admins.
+        </p>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Account Details</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-4 w-4" /> Account Details
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
             <div className="relative">
@@ -89,12 +100,20 @@ function SettingsPage() {
                 className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full bg-[oklch(0.28_0.09_265)] text-white shadow-md ring-2 ring-white transition hover:scale-105 disabled:opacity-60"
                 aria-label="Change photo"
               >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
               </button>
             </div>
             <div className="flex-1 space-y-2 text-center sm:text-left">
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleFile} />
-              <Button onClick={() => fileRef.current?.click()} disabled={uploading} variant="outline">
+              <Button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                variant="outline"
+              >
                 {uploading ? "Uploading…" : "Change photo"}
               </Button>
               <p className="text-xs text-muted-foreground">JPG, PNG or GIF · Max 5 MB</p>
@@ -131,8 +150,13 @@ function SettingsPage() {
 
       <PreferencesCard />
       <PasscodeCard />
-      <PasswordCard />
-      <SessionsCard />
+
+      <div className="mt-8">
+        <h2 className="font-display text-2xl font-semibold tracking-tight mb-4">
+          Account Security
+        </h2>
+        <UserProfile routing="hash" />
+      </div>
     </div>
   );
 }
@@ -140,8 +164,12 @@ function SettingsPage() {
 function PreferencesCard() {
   const { user, profile } = useAuth();
   const [notifyTasks, setNotifyTasks] = useState<boolean>((profile as any)?.notify_tasks ?? true);
-  const [notifyMessages, setNotifyMessages] = useState<boolean>((profile as any)?.notify_messages ?? true);
-  const [presenceHidden, setPresenceHidden] = useState<boolean>((profile as any)?.presence_hidden ?? false);
+  const [notifyMessages, setNotifyMessages] = useState<boolean>(
+    (profile as any)?.notify_messages ?? true,
+  );
+  const [presenceHidden, setPresenceHidden] = useState<boolean>(
+    (profile as any)?.presence_hidden ?? false,
+  );
   const [saving, setSaving] = useState<string | null>(null);
 
   async function update(key: string, value: boolean, setter: (v: boolean) => void) {
@@ -149,13 +177,15 @@ function PreferencesCard() {
     const prev = value;
     setter(value);
     setSaving(key);
-    const { error } = await supabase.from("profiles").update({ [key]: value } as any).eq("id", user.id);
-    setSaving(null);
-    if (error) {
+
+    try {
+      await updateProfile({ data: { [key]: value } });
+      toast.success("Preference saved");
+    } catch (error: any) {
       setter(!prev);
       toast.error(error.message);
-    } else {
-      toast.success("Preference saved");
+    } finally {
+      setSaving(null);
     }
   }
 
@@ -176,88 +206,42 @@ function PreferencesCard() {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><Bell className="h-4 w-4" /> Preferences</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bell className="h-4 w-4" /> Preferences
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
-        <Row icon={Bell} k="notify_tasks" title="Task notifications" desc="New assignments, approvals, revisions, and comments." checked={notifyTasks} onChange={(v: boolean) => update("notify_tasks", v, setNotifyTasks)} />
-        <Row icon={Bell} k="notify_messages" title="Chat notifications" desc="New direct and group messages." checked={notifyMessages} onChange={(v: boolean) => update("notify_messages", v, setNotifyMessages)} />
-        <Row icon={Eye} k="presence_hidden" title="Hide my online status" desc="Teammates won't see when you're active." checked={presenceHidden} onChange={(v: boolean) => update("presence_hidden", v, setPresenceHidden)} />
+        <Row
+          icon={Bell}
+          k="notify_tasks"
+          title="Task notifications"
+          desc="New assignments, approvals, revisions, and comments."
+          checked={notifyTasks}
+          onChange={(v: boolean) => update("notify_tasks", v, setNotifyTasks)}
+        />
+        <Row
+          icon={Bell}
+          k="notify_messages"
+          title="Chat notifications"
+          desc="New direct and group messages."
+          checked={notifyMessages}
+          onChange={(v: boolean) => update("notify_messages", v, setNotifyMessages)}
+        />
+        <Row
+          icon={Eye}
+          k="presence_hidden"
+          title="Hide my online status"
+          desc="Teammates won't see when you're active."
+          checked={presenceHidden}
+          onChange={(v: boolean) => update("presence_hidden", v, setPresenceHidden)}
+        />
       </CardContent>
     </Card>
   );
 }
 
-function SessionsCard() {
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-
-  async function signOutEverywhere() {
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.signOut({ scope: "global" });
-      if (error) throw error;
-      toast.success("Signed out from all devices");
-      navigate({ to: "/auth" });
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to sign out");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><LogOut className="h-4 w-4" /> Active Sessions</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">Sign out of this account on every device where you're currently logged in.</p>
-        <Button variant="destructive" onClick={signOutEverywhere} disabled={busy}>
-          {busy ? "Signing out…" : "Sign out everywhere"}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function PasswordCard() {
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (next.length < 8) { toast.error("Password must be at least 8 characters"); return; }
-    if (next !== confirm) { toast.error("Passwords don't match"); return; }
-    setSaving(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: next });
-      if (error) throw error;
-      toast.success("Password updated");
-      setNext(""); setConfirm("");
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to update password");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Account Password</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">Change the password you use to sign in.</p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="new-pw">New password</Label>
-            <Input id="new-pw" type="password" value={next} onChange={(e) => setNext(e.target.value)} placeholder="At least 8 characters" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="conf-pw">Confirm</Label>
-            <Input id="conf-pw" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-          </div>
-        </div>
-        <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Update password"}</Button>
-      </CardContent>
-    </Card>
-  );
-}
+// Removed Session and Password cards in favor of Clerk
 
 function PasscodeCard() {
   const [hasPin, setHasPin] = useState<boolean | null>(null);
@@ -267,23 +251,33 @@ function PasscodeCard() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.rpc("has_passcode").then(({ data }) => setHasPin(Boolean(data)));
+    checkPasscode().then(setHasPin);
   }, []);
 
   async function save() {
-    if (!/^\d{4}$/.test(next)) { toast.error("Passcode must be 4 digits"); return; }
-    if (next !== confirm) { toast.error("Passcodes don't match"); return; }
+    if (!/^\d{4}$/.test(next)) {
+      toast.error("Passcode must be 4 digits");
+      return;
+    }
+    if (next !== confirm) {
+      toast.error("Passcodes don't match");
+      return;
+    }
     setSaving(true);
     try {
       if (hasPin) {
-        const { data: ok, error } = await supabase.rpc("verify_passcode", { _pin: current });
-        if (error) throw error;
-        if (!ok) { toast.error("Current passcode is incorrect"); setSaving(false); return; }
+        const ok = await verifyPasscode({ data: current });
+        if (!ok) {
+          toast.error("Current passcode is incorrect");
+          setSaving(false);
+          return;
+        }
       }
-      const { error } = await supabase.rpc("set_passcode", { _pin: next });
-      if (error) throw error;
+      await updatePasscode({ data: next });
       toast.success(hasPin ? "Passcode updated" : "Passcode set");
-      setCurrent(""); setNext(""); setConfirm("");
+      setCurrent("");
+      setNext("");
+      setConfirm("");
       setHasPin(true);
     } catch (e: any) {
       toast.error(e.message ?? "Failed to save passcode");
@@ -310,7 +304,9 @@ function PasscodeCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> App Passcode</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Lock className="h-4 w-4" /> App Passcode
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">

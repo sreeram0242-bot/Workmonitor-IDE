@@ -1,95 +1,32 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/layout/AppShell";
-import { AuthProvider, type AppRole, type AuthState } from "@/hooks/use-auth";
-
-type CachedAuth = {
-  loading: false;
-  session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
-  user: NonNullable<Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"]>;
-  role: AppRole;
-  profile: NonNullable<AuthState["profile"]>;
-};
-
-let cachedAuth: CachedAuth | null = null;
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
-  beforeLoad: async ({ location }) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData.session;
-    if (!session) {
-      cachedAuth = null;
-      throw redirect({ to: "/auth" });
-    }
-
-    // Passcode gate. Mobile has a 60s grace period so quick app switches
-    // (checking WhatsApp, notifications, file pickers) don't force re-lock.
-    if (typeof window !== "undefined") {
-      const uid = session.user.id;
-      const unlocked = sessionStorage.getItem(`wm_unlocked:${uid}`);
-      const backgroundedAt = Number(sessionStorage.getItem(`wm_bg_at:${uid}`) || "0");
-      const withinGrace = backgroundedAt > 0 && Date.now() - backgroundedAt < 60_000;
-      if (!unlocked && !withinGrace) {
-        throw redirect({ to: "/lock", search: { redirect: location.href } });
-      }
-      // Coming back within grace: restore unlocked flag & clear grace timer
-      if (!unlocked && withinGrace) {
-        sessionStorage.setItem(`wm_unlocked:${uid}`, "1");
-        sessionStorage.removeItem(`wm_bg_at:${uid}`);
-      }
-    }
-
-    if (cachedAuth && cachedAuth.user.id === session.user.id && "badge" in cachedAuth.profile) {
-      cachedAuth = { ...cachedAuth, session };
-      return { initialAuthState: cachedAuth };
-    }
-
-    const [{ data: roleRow }, { data: profile }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", session.user.id).maybeSingle(),
-      supabase
-        .from("profiles")
-        .select("full_name, position, avatar_url, badge, notify_tasks, notify_messages, presence_hidden")
-        .eq("id", session.user.id)
-        .maybeSingle(),
-    ]);
-
-    cachedAuth = {
-      loading: false,
-      session,
-      user: session.user,
-      role: (roleRow?.role as AppRole | undefined) ?? "user",
-      profile: profile ?? { full_name: "", position: "", avatar_url: null },
-    };
-
-    return { initialAuthState: cachedAuth };
-  },
-  component: AuthenticatedLayout,
-});
-
-// Invalidate cache on sign-out so a new user re-fetches their role/profile.
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === "SIGNED_OUT" || event === "USER_UPDATED") {
-    cachedAuth = null;
-    if (typeof window !== "undefined" && session?.user?.id) {
-      sessionStorage.removeItem(`wm_unlocked:${session.user.id}`);
-    }
-  }
+  component: RouteComponent,
 });
 
 function AuthenticatedLayout() {
-  const { initialAuthState } = Route.useRouteContext();
-  const userId = initialAuthState?.user?.id;
+  // We handle auth redirection inside the layout component itself because
+  // useAuth depends on Clerk's useUser which is inside the ClerkProvider.
+  const { loading, user } = useAuth();
 
-  // Mobile: re-lock whenever the app is backgrounded (not on `blur` — that
-  // fires for the address bar, file pickers, etc. and would re-lock mid-task).
+  useEffect(() => {
+    if (!loading && !user) {
+      // Not logged in -> redirect to /auth
+      window.location.href = "/auth";
+    }
+  }, [loading, user]);
+
+  const userId = user?.id;
+
+  // Mobile: re-lock whenever the app is backgrounded
   // Desktop: 15-minute idle auto-lock.
   useEffect(() => {
     if (!userId) return;
     const isMobile = window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
-    // Mobile: mark backgrounded time instead of hard-relocking. beforeLoad
-    // will keep the tab unlocked if they come back within 60s.
     const markBackgrounded = () => {
       sessionStorage.setItem(`wm_bg_at:${userId}`, String(Date.now()));
       sessionStorage.removeItem(`wm_unlocked:${userId}`);
@@ -97,7 +34,9 @@ function AuthenticatedLayout() {
     const relockNow = () => sessionStorage.removeItem(`wm_unlocked:${userId}`);
 
     if (isMobile) {
-      const onVis = () => { if (document.visibilityState === "hidden") markBackgrounded(); };
+      const onVis = () => {
+        if (document.visibilityState === "hidden") markBackgrounded();
+      };
       document.addEventListener("visibilitychange", onVis);
       window.addEventListener("pagehide", markBackgrounded);
       return () => {
@@ -125,11 +64,39 @@ function AuthenticatedLayout() {
     };
   }, [userId]);
 
+  if (loading || !user) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  // Also check if we need to redirect to the pin lock screen
+  const unlocked =
+    typeof window !== "undefined" ? sessionStorage.getItem(`wm_unlocked:${userId}`) : null;
+  const backgroundedAt =
+    typeof window !== "undefined" ? Number(sessionStorage.getItem(`wm_bg_at:${userId}`) || "0") : 0;
+  const withinGrace = backgroundedAt > 0 && Date.now() - backgroundedAt < 60_000;
+
+  if (typeof window !== "undefined" && !unlocked && !withinGrace) {
+    window.location.href = `/lock?redirect=${encodeURIComponent(window.location.pathname)}`;
+    return null;
+  }
+
+  if (typeof window !== "undefined" && !unlocked && withinGrace) {
+    sessionStorage.setItem(`wm_unlocked:${userId}`, "1");
+    sessionStorage.removeItem(`wm_bg_at:${userId}`);
+  }
+
   return (
-    <AuthProvider initialState={initialAuthState}>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
+}
+
+// Wrapping in AuthProvider at the Route component level
+function RouteComponent() {
+  return (
+    <AuthProvider>
+      <AuthenticatedLayout />
     </AuthProvider>
   );
 }

@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/brand/Logo";
 import { toast } from "sonner";
+import { checkPasscode, verifyPasscode, updatePasscode } from "@/lib/settings.functions";
 
 type Search = { redirect?: string };
 
@@ -17,61 +18,42 @@ export const Route = createFileRoute("/lock")({
 function LockPage() {
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: "/lock" });
+  const { user, profile, isLoaded, signOut } = useAuth();
+
   const [mode, setMode] = useState<"loading" | "unlock" | "setup" | "confirm">("loading");
   const [pin, setPin] = useState("");
   const [firstPin, setFirstPin] = useState("");
   const [busy, setBusy] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("");
   const [shake, setShake] = useState(false);
   const [success, setSuccess] = useState(false);
   const [pressedKey, setPressedKey] = useState<number | null>(null);
-  const [lockUntil, setLockUntil] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-
   useEffect(() => {
+    if (!isLoaded) return;
+    if (!user) {
+      navigate({ to: "/auth" });
+      return;
+    }
+
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        navigate({ to: "/auth" });
-        return;
+      try {
+        const has = await checkPasscode();
+        setMode(has ? "unlock" : "setup");
+      } catch (e) {
+        console.error(e);
       }
-      setUserId(data.session.user.id);
-      const [{ data: prof }, { data: has }, { data: lock }] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("id", data.session.user.id).maybeSingle(),
-        supabase.rpc("has_passcode"),
-        supabase.rpc("get_pin_lock_status"),
-      ]);
-      setDisplayName(prof?.full_name || data.session.user.email || "");
-      setMode(has ? "unlock" : "setup");
-      const until = (lock as any)?.locked_until ? new Date((lock as any).locked_until).getTime() : null;
-      if (until && until > Date.now()) setLockUntil(until);
     })();
-  }, [navigate]);
+  }, [user, isLoaded, navigate]);
 
-  useEffect(() => { inputRef.current?.focus(); }, [mode]);
-
-  // Tick every 500ms while locked to update countdown
   useEffect(() => {
-    if (!lockUntil) return;
-    const id = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= lockUntil) { setLockUntil(null); setAttemptsLeft(null); }
-    }, 500);
-    return () => clearInterval(id);
-  }, [lockUntil]);
-
-  const locked = !!(lockUntil && lockUntil > now);
-  const secondsLeft = locked ? Math.ceil(((lockUntil ?? 0) - now) / 1000) : 0;
+    inputRef.current?.focus();
+  }, [mode]);
 
   // Global keyboard input for PIN entry
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (busy || locked || success) return;
+      if (busy || success) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key >= "0" && e.key <= "9") {
         e.preventDefault();
@@ -91,45 +73,38 @@ function LockPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, locked, success, mode, firstPin]);
-
+  }, [busy, success, mode, firstPin]);
 
   function finish() {
-    if (userId) sessionStorage.setItem(`wm_unlocked:${userId}`, "1");
+    if (user) sessionStorage.setItem(`wm_unlocked:${user.id}`, "1");
     navigate({ to: redirect || "/", replace: true });
   }
 
   async function handleForgot() {
-    if (!confirm("Reset your passcode? You will be signed out and asked to set a new PIN after signing in again.")) return;
+    if (
+      !confirm(
+        "Reset your passcode? You will be signed out and asked to set a new PIN after signing in again.",
+      )
+    )
+      return;
     try {
-      await supabase.rpc("clear_passcode");
+      await updatePasscode({ data: "" });
     } catch {}
-    if (userId) sessionStorage.removeItem(`wm_unlocked:${userId}`);
-    await supabase.auth.signOut();
+    if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
+    await signOut();
     navigate({ to: "/auth", replace: true });
   }
 
-
   async function submit(value: string) {
-    if (busy || locked) return;
+    if (busy) return;
     setBusy(true);
     try {
       if (mode === "unlock") {
-        const { data: res, error } = await supabase.rpc("verify_passcode", { _pin: value });
-        if (error) throw error;
-        const r = res as { ok: boolean; reason?: string; attempts_left?: number; locked_until?: string } | null;
-        if (!r?.ok) {
+        const ok = await verifyPasscode({ data: value });
+        if (!ok) {
           setShake(true);
           setTimeout(() => setShake(false), 500);
-          if (r?.reason === "locked" && r.locked_until) {
-            const until = new Date(r.locked_until).getTime();
-            setLockUntil(until);
-            setAttemptsLeft(0);
-            toast.error("Too many attempts. Locked for a moment.");
-          } else {
-            setAttemptsLeft(r?.attempts_left ?? null);
-            toast.error(`Incorrect passcode${r?.attempts_left != null ? ` — ${r.attempts_left} tries left` : ""}`);
-          }
+          toast.error(`Incorrect passcode`);
           setTimeout(() => setPin(""), 260);
           return;
         }
@@ -137,17 +112,23 @@ function LockPage() {
         setTimeout(finish, 480);
       } else if (mode === "setup") {
         setFirstPin(value);
-        setTimeout(() => { setPin(""); setMode("confirm"); }, 220);
+        setTimeout(() => {
+          setPin("");
+          setMode("confirm");
+        }, 220);
       } else if (mode === "confirm") {
         if (value !== firstPin) {
           setShake(true);
           setTimeout(() => setShake(false), 500);
           toast.error("Passcodes don't match");
-          setTimeout(() => { setPin(""); setFirstPin(""); setMode("setup"); }, 400);
+          setTimeout(() => {
+            setPin("");
+            setFirstPin("");
+            setMode("setup");
+          }, 400);
           return;
         }
-        const { error } = await supabase.rpc("set_passcode", { _pin: value });
-        if (error) throw error;
+        await updatePasscode({ data: value });
         setSuccess(true);
         toast.success("Passcode set");
         setTimeout(finish, 480);
@@ -160,8 +141,6 @@ function LockPage() {
     }
   }
 
-
-
   function onChange(v: string) {
     const clean = v.replace(/\D/g, "").slice(0, 4);
     setPin(clean);
@@ -169,16 +148,23 @@ function LockPage() {
   }
 
   const title =
-    mode === "unlock" ? "Enter your passcode"
-    : mode === "setup" ? "Create a 4-digit passcode"
-    : mode === "confirm" ? "Confirm your passcode"
-    : "";
+    mode === "unlock"
+      ? "Enter your passcode"
+      : mode === "setup"
+        ? "Create a 4-digit passcode"
+        : mode === "confirm"
+          ? "Confirm your passcode"
+          : "";
 
+  const displayName = profile?.full_name || user?.primaryEmailAddress?.emailAddress || "";
   const subtitle =
-    mode === "unlock" ? `Welcome back, ${displayName}`
-    : mode === "setup" ? "You'll use this every time you sign in"
-    : mode === "confirm" ? "Enter the same 4 digits again"
-    : "";
+    mode === "unlock"
+      ? `Welcome back, ${displayName}`
+      : mode === "setup"
+        ? "You'll use this every time you sign in"
+        : mode === "confirm"
+          ? "Enter the same 4 digits again"
+          : "";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white p-6">
@@ -196,9 +182,7 @@ function LockPage() {
             <h1 className="font-display text-xl font-semibold text-slate-900">
               {success ? "Verified successfully" : title}
             </h1>
-            {!success && (
-              <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-            )}
+            {!success && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           </div>
         </div>
 
@@ -270,34 +254,29 @@ function LockPage() {
           aria-label="Passcode"
         />
 
-        {locked && !success && (
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
-            Too many attempts. Try again in <span className="font-semibold">{secondsLeft}s</span>.
-          </div>
-        )}
-        {!locked && attemptsLeft != null && attemptsLeft > 0 && !success && (
-          <div className="mb-3 text-center text-xs text-amber-600">
-            {attemptsLeft} {attemptsLeft === 1 ? "try" : "tries"} left
-          </div>
-        )}
-
         {!success && (
-          <div className={`animate-pin-fade-up grid grid-cols-3 gap-3 ${locked ? "pointer-events-none opacity-50" : ""}`}>
-            {["1","2","3","4","5","6","7","8","9","reset","0","⌫"].map((k, idx) => (
+          <div className={`animate-pin-fade-up grid grid-cols-3 gap-3`}>
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "reset", "0", "⌫"].map((k, idx) => (
               <button
                 key={idx}
                 type="button"
-                disabled={!k || busy || locked}
+                disabled={!k || busy}
                 onClick={() => {
                   if (!k) return;
                   setPressedKey(idx);
                   setTimeout(() => setPressedKey((p) => (p === idx ? null : p)), 220);
                   if (k === "reset") {
                     setPin("");
-                    if (mode === "confirm") { setFirstPin(""); setMode("setup"); }
+                    if (mode === "confirm") {
+                      setFirstPin("");
+                      setMode("setup");
+                    }
                     return;
                   }
-                  if (k === "⌫") { setPin((p) => p.slice(0, -1)); return; }
+                  if (k === "⌫") {
+                    setPin((p) => p.slice(0, -1));
+                    return;
+                  }
                   if (pin.length >= 4) return;
                   const next = (pin + k).slice(0, 4);
                   setPin(next);
@@ -323,16 +302,13 @@ function LockPage() {
 
         {mode === "unlock" && !success && (
           <div className="relative mt-6 flex items-center justify-between text-xs">
-            <button
-              onClick={handleForgot}
-              className="text-slate-500 hover:text-blue-600"
-            >
+            <button onClick={handleForgot} className="text-slate-500 hover:text-blue-600">
               Forgot passcode?
             </button>
             <button
               onClick={async () => {
-                if (userId) sessionStorage.removeItem(`wm_unlocked:${userId}`);
-                await supabase.auth.signOut();
+                if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
+                await signOut();
                 navigate({ to: "/auth" });
               }}
               className="text-slate-500 hover:text-slate-900"
@@ -345,5 +321,3 @@ function LockPage() {
     </div>
   );
 }
-
-

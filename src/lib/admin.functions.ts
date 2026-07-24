@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getAuth, clerkClient } from "@clerk/tanstack-start/server";
+import { getRequest } from "@tanstack/react-start/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -11,130 +15,123 @@ const createUserSchema = z.object({
 });
 
 export const createTeamMember = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => createUserSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    // verify caller is admin
-    const { data: roleRow } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (roleRow?.role !== "admin") {
+  .validator((data: unknown) => createUserSchema.parse(data))
+  .handler(async ({ data }) => {
+    const req = getRequest();
+    if (!req) throw new Error("No request");
+    const auth = await getAuth(req);
+    if (!auth.userId) throw new Error("Unauthorized");
+
+    const callerRole = await prisma.userRole.findUnique({
+      where: { user_id: auth.userId },
+      select: { role: true },
+    });
+    if (callerRole?.role !== "admin") {
       throw new Error("Forbidden");
     }
 
-    let createdUser;
-    let fallbackToAnon = false;
-    
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      // Accessing a property triggers the proxy and throws if key is missing
-      const { data: authData, error } = await supabaseAdmin.auth.admin.createUser({
-        email: data.email,
+      const client = await clerkClient();
+      const user = await client.users.createUser({
+        emailAddress: [data.email],
         password: data.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: data.full_name,
-          position: data.position,
-          role: data.role,
-        },
+        firstName: data.full_name.split(" ")[0] || "",
+        lastName: data.full_name.split(" ").slice(1).join(" ") || "",
+        publicMetadata: { role: data.role },
       });
-      if (error || !authData.user) {
-        throw new Error(error?.message ?? "Failed to create user");
-      }
-      createdUser = authData.user;
-      
-      await supabaseAdmin.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
-      await supabaseAdmin.from("profiles").upsert({ id: createdUser.id, full_name: data.full_name, position: data.position });
-      
-      return { id: createdUser.id };
-    } catch (e: any) {
-      if (e.message?.includes("Missing Supabase environment variable(s)")) {
-        console.warn("Service role key missing, falling back to anon signUp");
-        fallbackToAnon = true;
-      } else {
-        throw e;
-      }
-    }
 
-    if (fallbackToAnon) {
-      // Fallback for Vercel without service role key: use signUp on a separate client
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabaseAnon = createClient(
-        process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!,
-        process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
-        { auth: { persistSession: false } }
-      );
-      const { data: authData, error } = await supabaseAnon.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: { full_name: data.full_name, position: data.position, role: data.role }
-        }
+      await prisma.userRole.upsert({
+        where: { user_id_role: { user_id: user.id, role: data.role } },
+        update: { role: data.role },
+        create: { user_id: user.id, role: data.role },
       });
-      if (error || !authData.user) {
-        throw new Error(error?.message ?? "Failed to sign up user");
-      }
-      createdUser = authData.user;
-      
-      // We must insert into profiles manually because the database trigger might not copy 'position'
-      // First try with the newly created user's own token (bypasses RLS 'own profile' restrictions)
-      if (authData.session) {
-        await supabaseAnon.from("profiles").upsert({
-          id: createdUser.id,
-          full_name: data.full_name,
-          position: data.position
-        });
-      } else {
-        // If email confirmations are enforced, session is null. Fallback to admin token and hope RLS allows it.
-        await context.supabase.from("profiles").upsert({
-          id: createdUser.id,
-          full_name: data.full_name,
-          position: data.position
-        });
-      }
-      
-      await context.supabase.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
-      return { id: createdUser.id };
+      await prisma.profile.upsert({
+        where: { id: user.id },
+        update: { full_name: data.full_name, position: data.position },
+        create: { id: user.id, full_name: data.full_name, position: data.position },
+      });
+
+      return { id: user.id };
+    } catch (e: any) {
+      throw new Error(e?.message ?? "Failed to create user");
     }
   });
 
 export const deleteTeamMember = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ user_id: z.string().uuid() }).parse(data))
-  .handler(async ({ data, context }) => {
-    const { data: roleRow } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (roleRow?.role !== "admin") {
+  .validator((data: unknown) => z.object({ user_id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const req = getRequest();
+    if (!req) throw new Error("No request");
+    const auth = await getAuth(req);
+    if (!auth.userId) throw new Error("Unauthorized");
+
+    const callerRole = await prisma.userRole.findUnique({
+      where: { user_id: auth.userId },
+      select: { role: true },
+    });
+    if (callerRole?.role !== "admin") {
       throw new Error("Forbidden");
     }
-    if (data.user_id === context.userId) {
+    if (data.user_id === auth.userId) {
       throw new Error("Cannot delete yourself");
     }
-    
-    let fallbackToAnon = false;
+
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-      if (error) throw new Error(error.message);
+      const client = await clerkClient();
+      await client.users.deleteUser(data.user_id);
+
+      await prisma.userRole.deleteMany({ where: { user_id: data.user_id } });
+      await prisma.profile.deleteMany({ where: { id: data.user_id } });
+
+      return { ok: true };
     } catch (e: any) {
-      if (e.message?.includes("Missing Supabase environment variable(s)")) {
-        console.warn("Service role key missing, using fallback for delete user");
-        fallbackToAnon = true;
-      } else {
-        throw e;
-      }
+      throw new Error(e?.message ?? "Failed to delete user");
+    }
+  });
+
+export const resetUserPasscode = createServerFn({ method: "POST" })
+  .validator((data: { targetUserId: string }) => data)
+  .handler(async ({ data: { targetUserId } }) => {
+    const req = getRequest();
+    if (!req) throw new Error("No request");
+    const auth = await getAuth(req);
+    if (!auth.userId) throw new Error("Unauthorized");
+
+    const callerRole = await prisma.userRole.findUnique({
+      where: { user_id: auth.userId },
+      select: { role: true },
+    });
+    if (callerRole?.role !== "admin") {
+      throw new Error("Forbidden");
     }
 
-    if (fallbackToAnon) {
-      // Fallback: Just delete them from user_roles and profiles so they can't log in or appear in the app
-      await context.supabase.from("user_roles").delete().eq("user_id", data.user_id);
-      await context.supabase.from("profiles").delete().eq("id", data.user_id);
-    }
-    
-    return { ok: true };
+    await prisma.profile.update({
+      where: { id: targetUserId },
+      data: { passcode: null },
+    });
+
+    return true;
   });
+
+export const fetchDevStats = createServerFn({ method: "GET" }).handler(async () => {
+  const req = getRequest();
+  if (!req) throw new Error("No request");
+  const auth = await getAuth(req);
+  if (!auth.userId) throw new Error("Unauthorized");
+
+  const callerProfile = await prisma.profile.findUnique({
+    where: { id: auth.userId },
+  });
+  if (callerProfile?.badge !== "Developer") {
+    throw new Error("Forbidden");
+  }
+
+  const [users, tasks, messages, approved] = await Promise.all([
+    prisma.profile.count(),
+    prisma.task.count(),
+    prisma.message.count(),
+    prisma.task.count({ where: { status: "approved" } }),
+  ]);
+
+  return { users, tasks, messages, approved };
+});
