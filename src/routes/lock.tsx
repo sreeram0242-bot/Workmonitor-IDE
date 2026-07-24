@@ -42,8 +42,12 @@ function LockPage() {
       try {
         const has = await checkPasscode();
         setMode(has ? "unlock" : "setup");
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        toast.error("Failed to connect to server. Please try refreshing.");
+        // Fallback to unlock mode so it doesn't freeze completely,
+        // though the next submit will likely fail too if the server is down.
+        setMode("unlock");
       }
     })();
   }, [user, loading, navigate]);
