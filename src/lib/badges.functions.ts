@@ -40,12 +40,29 @@ export const setMemberBadge = createServerFn({ method: "POST" })
       }
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("profiles")
-      .update({ badge } as any)
-      .eq("id", data.user_id);
-    if (error) throw new Response(error.message, { status: 400 });
+    let adminClient;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      adminClient = supabaseAdmin;
+    } catch (e) {
+      console.warn("Service role key missing, using fallback for badge update");
+    }
+
+    if (adminClient) {
+      const { error } = await adminClient
+        .from("profiles")
+        .update({ badge } as any)
+        .eq("id", data.user_id);
+      if (error) throw new Response(error.message, { status: 400 });
+    } else {
+      // Fallback: try to update using current user's token. 
+      // If RLS prevents admins from updating profiles, this might fail, but it prevents 500 crashes
+      const { error } = await context.supabase
+        .from("profiles")
+        .update({ badge } as any)
+        .eq("id", data.user_id);
+      if (error) throw new Response(error.message, { status: 400 });
+    }
     return { ok: true };
   });
 
