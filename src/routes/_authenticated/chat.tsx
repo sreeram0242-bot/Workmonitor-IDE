@@ -560,11 +560,17 @@ function ChatPage() {
     if (!user) return;
     setOpeningDM(otherId);
     try {
-      const id = await findOrCreateDM(user.id, otherId);
+      console.log(`[DM] Sending request to findOrCreateDM for user ${otherId} via /_server API...`);
+      // Add a 10s timeout to prevent infinite spinners in case the network request is swallowed/blocked silently
+      const id = await Promise.race([
+        findOrCreateDM(user.id, otherId),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Request timed out after 10s")), 10000))
+      ]);
       await reloadConversations();
       setActiveId(id);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to open DM");
+    } catch (e: any) {
+      console.error("[DM] Failed to open DM:", e);
+      toast.error(`Failed to start DM: ${e?.message || "Network error"}`);
     } finally {
       setOpeningDM(null);
     }
