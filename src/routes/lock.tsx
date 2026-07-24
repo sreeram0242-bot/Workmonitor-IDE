@@ -83,7 +83,7 @@ function LockPage() {
 
   function finish() {
     if (user) {
-      localStorage.setItem(`wm_unlocked:${user.id}`, "1");
+      sessionStorage.setItem("wm_unlocked", "1");
       localStorage.setItem(`wm_last_active:${user.id}`, String(Date.now()));
     }
     navigate({ to: redirect || "/", replace: true });
@@ -99,7 +99,7 @@ function LockPage() {
     try {
       await updatePasscode({ data: "" });
     } catch {}
-    if (user) localStorage.removeItem(`wm_unlocked:${user.id}`);
+    sessionStorage.removeItem("wm_unlocked");
     await clerk.signOut();
     navigate({ to: "/auth", replace: true });
   }
@@ -319,7 +319,7 @@ function LockPage() {
             </button>
             <button
               onClick={async () => {
-                if (user) localStorage.removeItem(`wm_unlocked:${user.id}`);
+                sessionStorage.removeItem("wm_unlocked");
                 await clerk.signOut();
                 navigate({ to: "/auth" });
               }}
