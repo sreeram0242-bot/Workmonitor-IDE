@@ -18,13 +18,15 @@ import {
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useClerk } from "@clerk/tanstack-react-start";
 import { toast } from "sonner";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { ShortcutsHelp } from "@/components/layout/ShortcutsHelp";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { role, profile, user, signOut: authSignOut } = useAuth();
+  const { role, profile, user } = useAuth();
+  const clerk = useClerk();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -65,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     : baseNav;
 
   async function signOut() {
-    await authSignOut();
+    await clerk.signOut();
     toast.success("Signed out");
     navigate({ to: "/auth" });
   }

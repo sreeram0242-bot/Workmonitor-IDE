@@ -310,7 +310,7 @@ function LockPage() {
             <button
               onClick={async () => {
                 if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
-                await signOut();
+                await clerk.signOut();
                 navigate({ to: "/auth" });
               }}
               className="text-slate-500 hover:text-slate-900"

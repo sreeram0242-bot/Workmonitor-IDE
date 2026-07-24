@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/ably.functions";
+import * as cloudinaryModule from "cloudinary";
+
+const cloudinary = cloudinaryModule.v2;
 
 async function getAuthOrThrow() {
   const authResult = await auth();
@@ -85,6 +89,14 @@ export const renameSubtask = createServerFn({ method: "POST" })
     return true;
   });
 
+export const updateSubtask = createServerFn({ method: "POST" })
+  .validator((data: { id: string; updates: any }) => data)
+  .handler(async ({ data: { id, updates } }) => {
+    const authResult = await getAuthOrThrow();
+    await prisma.subtask.update({ where: { id }, data: updates });
+    return true;
+  });
+
 export const deleteSubtask = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
@@ -152,10 +164,6 @@ export const deleteTask = createServerFn({ method: "POST" })
     return true;
   });
 
-import { broadcast } from "@/lib/ably.functions";
-
-// cloudinary is loaded lazily inside the handler (server-only)
-
 export const submitTaskProof = createServerFn({ method: "POST" })
   .validator(
     (data: { taskId: string; fileBase64: string; fileName: string; note: string | null }) => data,
@@ -163,14 +171,13 @@ export const submitTaskProof = createServerFn({ method: "POST" })
   .handler(async ({ data: { taskId, fileBase64, fileName, note } }) => {
     const authResult = await getAuthOrThrow();
 
-    // Upload to Cloudinary (lazy require - server only)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { v2: cloudinary } = require("cloudinary");
+    // Configure Cloudinary from environment
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
+
     const base64Data = `data:image/jpeg;base64,${fileBase64}`;
     const uploadResult = await cloudinary.uploader.upload(base64Data, {
       folder: `workmonitor/${authResult.userId}/${taskId}`,
@@ -224,10 +231,7 @@ export const deleteTaskComment = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     const authResult = await getAuthOrThrow();
-    await prisma.taskComment.delete({ where: { id } });
-    
-    // We should also get the taskId to broadcast, but for now we broadcast to all if we can't.
-    // We can fetch the comment first to get the task_id.
+    // Fetch the comment first to get task_id for broadcast, then delete
     const comment = await prisma.taskComment.findUnique({ where: { id } });
     if (comment) {
       await prisma.taskComment.delete({ where: { id } });

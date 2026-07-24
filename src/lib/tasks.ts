@@ -8,17 +8,17 @@ import {
   toggleSubtask as serverToggleSubtask,
   renameSubtask as serverRenameSubtask,
   deleteSubtask as serverDeleteSubtask,
+  updateSubtask as serverUpdateSubtask,
   bulkApproveTasks as serverBulkApproveTasks,
   bulkDeleteTasks as serverBulkDeleteTasks,
   bulkReassignTasks as serverBulkReassignTasks,
   createTask as serverCreateTask,
   updateTask as serverUpdateTask,
   deleteTask as serverDeleteTask,
-  updateSubtask,
-  submitTaskProof,
-  fetchTaskComments,
-  addTaskComment,
-  deleteTaskComment,
+  submitTaskProof as serverSubmitTaskProof,
+  fetchTaskComments as serverFetchTaskComments,
+  addTaskComment as serverAddTaskComment,
+  deleteTaskComment as serverDeleteTaskComment,
 } from "./tasks.functions";
 
 export type TaskStatus = "pending" | "completed" | "approved" | "revision";
@@ -172,29 +172,6 @@ export async function deleteTask(id: string) {
   return await serverDeleteTask({ data: id });
 }
 
-// Reminders placeholder
-export interface ReminderRow {
-  id: string;
-  user_id: string;
-  title: string;
-  remind_at: string | Date;
-  notified: boolean;
-  created_at: string | Date;
-}
-export async function fetchReminders(): Promise<ReminderRow[]> {
-  return [];
-}
-export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
-  return null;
-}
-
-import {
-  submitTaskProof as serverSubmitTaskProof,
-  fetchTaskComments as serverFetchTaskComments,
-  addTaskComment as serverAddTaskComment,
-  deleteTaskComment as serverDeleteTaskComment,
-} from "./tasks.functions";
-
 export async function submitTaskProof(
   taskId: string,
   fileBase64: string,
@@ -214,4 +191,20 @@ export async function addTaskComment(taskId: string, body: string) {
 
 export async function deleteTaskComment(id: string) {
   return await serverDeleteTaskComment({ data: id });
+}
+
+// Reminders placeholder
+export interface ReminderRow {
+  id: string;
+  user_id: string;
+  title: string;
+  remind_at: string | Date;
+  notified: boolean;
+  created_at: string | Date;
+}
+export async function fetchReminders(): Promise<ReminderRow[]> {
+  return [];
+}
+export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
+  return null;
 }

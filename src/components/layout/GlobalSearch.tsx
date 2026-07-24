@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useClerk } from "@clerk/tanstack-react-start";
 import {
   Search,
   ListChecks,
@@ -41,7 +42,8 @@ export function GlobalSearch() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const navigate = useNavigate();
-  const { role, signOut } = useAuth();
+  const { role } = useAuth();
+  const clerk = useClerk();
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -137,7 +139,8 @@ export function GlobalSearch() {
       icon: LogOut,
       run: async () => {
         setOpen(false);
-        await signOut();
+        await clerk.signOut();
+        navigate({ to: "/auth" });
       },
     });
     return list;

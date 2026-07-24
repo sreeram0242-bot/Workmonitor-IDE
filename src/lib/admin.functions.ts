@@ -109,7 +109,7 @@ export const resetUserPasscode = createServerFn({ method: "POST" })
 
     await prisma.profile.update({
       where: { id: targetUserId },
-      data: { passcode: null, passcode_hash: null },
+      data: { passcode_hash: null },
     });
 
     return true;

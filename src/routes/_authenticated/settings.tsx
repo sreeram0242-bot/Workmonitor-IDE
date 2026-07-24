@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Switch } from "@/components/ui/switch";
-import { UserProfile, useClerk } from "@clerk/tanstack-react-start";
+import { UserProfile } from "@clerk/tanstack-react-start";
+import { Lock, Camera, Loader2, Bell, Eye } from "lucide-react";
+import { toast } from "sonner";
 import {
   updateProfile,
   checkPasscode,
