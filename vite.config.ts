@@ -15,7 +15,4 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  ssr: {
-    external: ["pg", "@prisma/adapter-pg", "@prisma/client", "prisma"],
-  },
 });
