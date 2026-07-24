@@ -68,6 +68,19 @@ function useAuthState(initialState?: AuthState): AuthState {
         if (mounted) setState(nextState);
       } catch (e) {
         console.error("Failed to fetch profile", e);
+        const fallbackState: AuthState = {
+          loading: false,
+          session: { user: { id: user.id } },
+          user: { id: user.id, email: user.primaryEmailAddress?.emailAddress },
+          role: "user",
+          profile: {
+            full_name: user.fullName || "New User",
+            position: "",
+            avatar_url: user.imageUrl,
+          },
+        };
+        cachedAuthState = fallbackState;
+        if (mounted) setState(fallbackState);
       }
     }
 
