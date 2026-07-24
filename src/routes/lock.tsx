@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useClerk } from "@clerk/tanstack-start";
 import { Logo } from "@/components/brand/Logo";
 import { toast } from "sonner";
 import { checkPasscode, verifyPasscode, updatePasscode } from "@/lib/settings.functions";
@@ -18,7 +19,8 @@ export const Route = createFileRoute("/lock")({
 function LockPage() {
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: "/lock" });
-  const { user, profile, isLoaded, signOut } = useAuth();
+  const { user, profile, loading } = useAuth();
+  const clerk = useClerk();
 
   const [mode, setMode] = useState<"loading" | "unlock" | "setup" | "confirm">("loading");
   const [pin, setPin] = useState("");
@@ -30,7 +32,7 @@ function LockPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (loading) return;
     if (!user) {
       navigate({ to: "/auth" });
       return;
@@ -44,7 +46,7 @@ function LockPage() {
         console.error(e);
       }
     })();
-  }, [user, isLoaded, navigate]);
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -91,7 +93,7 @@ function LockPage() {
       await updatePasscode({ data: "" });
     } catch {}
     if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
-    await signOut();
+    await clerk.signOut();
     navigate({ to: "/auth", replace: true });
   }
 
@@ -156,7 +158,7 @@ function LockPage() {
           ? "Confirm your passcode"
           : "";
 
-  const displayName = profile?.full_name || user?.primaryEmailAddress?.emailAddress || "";
+  const displayName = profile?.full_name || user?.email || "";
   const subtitle =
     mode === "unlock"
       ? `Welcome back, ${displayName}`
