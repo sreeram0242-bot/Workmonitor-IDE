@@ -210,7 +210,7 @@ export const findOrCreateDM = createServerFn({ method: "POST" })
     }
 
     const conv = await prisma.conversation.create({
-      data: { is_group: false, name: null },
+      data: { is_group: false, name: null, created_by: currentUserId },
     });
 
     await prisma.conversationMember.createMany({
@@ -231,7 +231,7 @@ export const createGroup = createServerFn({ method: "POST" })
   .handler(async ({ data: { name, memberIds } }) => {
     const authResult = await getAuthOrThrow();
     const conv = await prisma.conversation.create({
-      data: { is_group: true, name },
+      data: { is_group: true, name, created_by: authResult.userId },
     });
 
     const ids = Array.from(new Set([authResult.userId, ...memberIds]));
