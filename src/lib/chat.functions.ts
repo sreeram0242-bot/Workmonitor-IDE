@@ -1,13 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAuth } from "@clerk/tanstack-start/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
 import { broadcast } from "@/lib/ably.functions";
 
 // cloudinary config is applied lazily inside handlers (server-only)
 
-const prisma = new PrismaClient();
 
 function getReqOrThrow() {
   const req = getRequest();

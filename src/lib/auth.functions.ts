@@ -1,9 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAuth } from "@clerk/tanstack-start/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export const getMyProfile = createServerFn({ method: "GET" }).handler(async () => {
   const req = getRequest();

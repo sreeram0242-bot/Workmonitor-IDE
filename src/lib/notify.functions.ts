@@ -1,10 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAuth } from "@clerk/tanstack-start/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/ably.functions";
-
-const prisma = new PrismaClient();
 
 function getReqOrThrow() {
   const req = getRequest();

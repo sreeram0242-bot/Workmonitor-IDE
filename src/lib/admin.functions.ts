@@ -2,9 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getAuth, clerkClient } from "@clerk/tanstack-start/server";
 import { getRequest } from "@tanstack/react-start/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 const createUserSchema = z.object({
   email: z.string().email(),
