@@ -465,7 +465,23 @@ function AuthPage() {
               </div>
             </div>
 
-            <SignIn routing="virtual" />
+            <SignIn
+              routing="virtual"
+              appearance={{
+                elements: {
+                  // Hide the "Don't have an account? Sign up" footer link
+                  footerAction: { display: "none" },
+                  footerActionLink: { display: "none" },
+                  footer: { display: "none" },
+                },
+              }}
+            />
+            <p className="mt-4 text-center text-xs text-[#94a3b8]">
+              Don't have an account?{" "}
+              <span className="font-medium text-[#64748b]">
+                Contact your workspace admin.
+              </span>
+            </p>
           </div>
         </div>
       </div>
