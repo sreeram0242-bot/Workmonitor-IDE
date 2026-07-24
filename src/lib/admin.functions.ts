@@ -57,6 +57,10 @@ export const createTeamMember = createServerFn({ method: "POST" })
 
       return { id: user.id };
     } catch (e: any) {
+      console.error("createTeamMember error:", JSON.stringify(e, null, 2));
+      if (e?.errors && e.errors.length > 0) {
+        throw new Error(e.errors[0].longMessage || e.errors[0].message || "Failed to create user");
+      }
       throw new Error(e?.message ?? "Failed to create user");
     }
   });
