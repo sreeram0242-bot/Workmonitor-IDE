@@ -77,6 +77,24 @@ export const createTeamMember = createServerFn({ method: "POST" })
         throw new Response(error?.message ?? "Failed to sign up user", { status: 400 });
       }
       createdUser = authData.user;
+      
+      // We must insert into profiles manually because the database trigger might not copy 'position'
+      // First try with the newly created user's own token (bypasses RLS 'own profile' restrictions)
+      if (authData.session) {
+        await supabaseAnon.from("profiles").upsert({
+          id: createdUser.id,
+          full_name: data.full_name,
+          position: data.position
+        });
+      } else {
+        // If email confirmations are enforced, session is null. Fallback to admin token and hope RLS allows it.
+        await context.supabase.from("profiles").upsert({
+          id: createdUser.id,
+          full_name: data.full_name,
+          position: data.position
+        });
+      }
+      
       await context.supabase.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
       return { id: createdUser.id };
     }

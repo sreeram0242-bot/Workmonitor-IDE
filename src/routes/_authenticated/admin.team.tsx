@@ -50,7 +50,7 @@ function TeamPage() {
   const [editingBadge, setEditingBadge] = useState<TeamMember | null>(null);
 
 
-  async function reload() { setTeam(await fetchTeam()); }
+  async function reload() { setTeam(await fetchTeam(true)); }
   useEffect(() => { reload(); }, []);
 
   const isAdmin = role === "admin";
