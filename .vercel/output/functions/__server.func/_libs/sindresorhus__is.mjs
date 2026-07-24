@@ -1,4 +1,4 @@
-import { r as __commonJSMin } from "../_ssr/async-local-storage-C5fJChCT.mjs";
+import { t as __commonJSMin } from "../_runtime.mjs";
 //#region node_modules/got/node_modules/@sindresorhus/is/dist/index.js
 var require_dist = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	Object.defineProperty(exports, "__esModule", { value: true });
