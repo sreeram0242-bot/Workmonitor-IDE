@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { auth } from "@clerk/tanstack-react-start/server";
+import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 
 async function getAuthOrThrow() {
@@ -24,9 +24,19 @@ export const updateProfile = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: updates }) => {
     const authResult = await getAuthOrThrow();
-    await prisma.profile.update({
+    const client = await clerkClient();
+    const user = await client.users.getUser(authResult.userId);
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.emailAddresses[0]?.emailAddress || "User";
+
+    await prisma.profile.upsert({
       where: { id: authResult.userId },
-      data: updates,
+      update: updates,
+      create: {
+        id: authResult.userId,
+        full_name: fullName,
+        position: "Member",
+        ...updates
+      }
     });
     return true;
   });
@@ -60,9 +70,19 @@ export const updatePasscode = createServerFn({ method: "POST" })
   .validator((pin: string) => pin)
   .handler(async ({ data: pin }) => {
     const authResult = await getAuthOrThrow();
-    await prisma.profile.update({
+    const client = await clerkClient();
+    const user = await client.users.getUser(authResult.userId);
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.emailAddresses[0]?.emailAddress || "User";
+
+    await prisma.profile.upsert({
       where: { id: authResult.userId },
-      data: { passcode_hash: pin },
+      update: { passcode_hash: pin },
+      create: {
+        id: authResult.userId,
+        full_name: fullName,
+        position: "Member",
+        passcode_hash: pin
+      }
     });
     return true;
   });
