@@ -11,6 +11,7 @@ import {
   getCachedTeam,
   fetchTeam,
 } from "@/lib/tasks";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
 type Comment = {
   id: string;
@@ -63,10 +64,12 @@ export function TaskComments({ taskId }: { taskId: string }) {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 5000); // Poll every 5s
-    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
+
+  useRealtimeSubscription("tasks", `comments-${taskId}`, () => {
+    load();
+  });
 
   async function send() {
     if (!user || !body.trim()) return;

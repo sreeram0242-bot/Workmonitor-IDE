@@ -12,6 +12,7 @@ import {
   type TaskRow,
   type TeamMember,
 } from "@/lib/tasks";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,9 +113,11 @@ function AdminOverview() {
 
   useEffect(() => {
     reloadAll();
-    const id = setInterval(reloadTasks, 10000); // Poll every 10s
-    return () => clearInterval(id);
   }, []);
+
+  useRealtimeSubscription("tasks", "task-updates", () => {
+    reloadTasks();
+  });
 
   const from = rangeStart(range, customFrom);
   const to =

@@ -26,6 +26,7 @@ import {
 import { scheduleOneSignalNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
 export const Route = createFileRoute("/_authenticated/admin/calendar")({
   head: () => ({
@@ -85,9 +86,13 @@ function CalendarPage() {
         .catch(() => {});
     }
     load();
-    const id = setInterval(load, 10000); // Poll every 10s
-    return () => clearInterval(id);
   }, []);
+
+  useRealtimeSubscription("tasks", "task-updates", () => {
+    fetchTasksForAdmin()
+      .then(setTasks)
+      .catch(() => {});
+  });
 
   async function handleAddReminder(e: React.FormEvent) {
     e.preventDefault();

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAuth } from "@clerk/tanstack-start/server";
 import { PrismaClient } from "@prisma/client";
+import { broadcast } from "@/lib/ably.functions";
 
 const prisma = new PrismaClient();
 
@@ -91,6 +92,10 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
           console.error("OneSignal push error:", err);
         }
       }
+    }
+
+    for (const it of filtered) {
+      await broadcast("notifications", `user-${it.user_id}`, { type: "new_notification" });
     }
 
     return true;

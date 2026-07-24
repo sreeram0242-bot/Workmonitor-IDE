@@ -105,6 +105,8 @@ import {
   type Reaction,
 } from "@/lib/chat";
 
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/chat")({
@@ -288,11 +290,12 @@ function ChatPage() {
 
   useEffect(() => {
     reloadConversations();
-    if (!user) return;
-    const id = setInterval(reloadConversations, 5000); // Poll every 5s
-    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useRealtimeSubscription("conversations", `user-${user?.id}`, () => {
+    reloadConversations();
+  });
 
   // Load starred ids once per user
   useEffect(() => {
@@ -330,10 +333,15 @@ function ChatPage() {
     }
 
     loadChat();
-    const id = setInterval(loadChat, 3000); // Poll messages every 3s
-
-    return () => clearInterval(id);
   }, [activeId, user?.id]);
+
+  useRealtimeSubscription("chat", `message-${activeId}`, () => {
+    if (!activeId || !user) return;
+    fetchMessages(activeId).then((msgs) => {
+      setMessages(msgs);
+      setHasMoreOlder(msgs.length >= MESSAGES_PAGE_SIZE);
+    });
+  });
 
   useEffect(() => {
     if (loadingOlder) return;

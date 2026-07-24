@@ -2,8 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getAuth } from "@clerk/tanstack-start/server";
 import { PrismaClient } from "@prisma/client";
-import { put } from "@vercel/blob";
+import { v2 as cloudinary } from "cloudinary";
+import { broadcast } from "@/lib/ably.functions";
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 const prisma = new PrismaClient();
 
 function getReqOrThrow() {
@@ -148,6 +154,8 @@ export const sendMessage = createServerFn({ method: "POST" })
         console.error("Failed to send push notification", err);
       }
 
+      await broadcast("chat", `message-${conversationId}`, { type: "new_message", messageId: newMsg.id });
+
       return newMsg;
     },
   );
@@ -160,12 +168,11 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
   .handler(async ({ data: { conversationId, fileBase64, fileName, mimeType } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
 
-    const buffer = Buffer.from(fileBase64, "base64");
-    const path = `${conversationId}/${auth.userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${fileName}`;
-
-    const blob = await put(path, buffer, {
-      access: "public",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+    const base64Data = `data:${mimeType};base64,${fileBase64}`;
+    const uploadResult = await cloudinary.uploader.upload(base64Data, {
+      folder: `workmonitor/chat/${conversationId}`,
+      public_id: `${auth.userId}-${Date.now()}-${fileName}`,
+      resource_type: "auto",
     });
 
     const kind = mimeType.startsWith("image/")
@@ -177,11 +184,11 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
           : "file";
 
     return {
-      path,
-      url: blob.url,
+      path: uploadResult.public_id,
+      url: uploadResult.secure_url,
       name: fileName,
       type: mimeType,
-      size: buffer.length,
+      size: uploadResult.bytes,
       kind,
     };
   });
@@ -218,6 +225,9 @@ export const findOrCreateDM = createServerFn({ method: "POST" })
       ],
     });
 
+    await broadcast("conversations", `user-${currentUserId}`, { type: "new_conversation" });
+    await broadcast("conversations", `user-${otherUserId}`, { type: "new_conversation" });
+
     return conv.id;
   });
 
@@ -233,6 +243,11 @@ export const createGroup = createServerFn({ method: "POST" })
     await prisma.conversationMember.createMany({
       data: ids.map((id) => ({ conversation_id: conv.id, user_id: id })),
     });
+
+    for (const id of ids) {
+      await broadcast("conversations", `user-${id}`, { type: "new_group" });
+    }
+    
     return conv.id;
   });
 
@@ -240,10 +255,11 @@ export const editMessage = createServerFn({ method: "POST" })
   .validator((data: { messageId: string; content: string }) => data)
   .handler(async ({ data: { messageId, content } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
-    await prisma.message.update({
+    const message = await prisma.message.update({
       where: { id: messageId },
       data: { content, edited_at: new Date() },
     });
+    await broadcast("chat", `message-${message.conversation_id}`, { type: "edit_message", messageId });
     return true;
   });
 
@@ -251,10 +267,11 @@ export const deleteMessage = createServerFn({ method: "POST" })
   .validator((messageId: string) => messageId)
   .handler(async ({ data: messageId }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
-    await prisma.message.update({
+    const message = await prisma.message.update({
       where: { id: messageId },
       data: { content: "", attachments: [], deleted_at: new Date() },
     });
+    await broadcast("chat", `message-${message.conversation_id}`, { type: "delete_message", messageId });
     return true;
   });
 

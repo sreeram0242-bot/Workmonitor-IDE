@@ -110,6 +110,7 @@ export const bulkApproveTasks = createServerFn({ method: "POST" })
       where: { id: { in: ids } },
       data: { status: "approved", revision_note: null },
     });
+    await broadcast("tasks", "task-updates", { type: "bulk_approve" });
     return true;
   });
 
@@ -138,7 +139,9 @@ export const createTask = createServerFn({ method: "POST" })
   .validator((data: any) => data)
   .handler(async ({ data }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
-    return await prisma.task.create({ data });
+    const task = await prisma.task.create({ data });
+    await broadcast("tasks", "task-updates", { type: "task_created", taskId: task.id });
+    return task;
   });
 
 export const updateTask = createServerFn({ method: "POST" })
@@ -146,6 +149,7 @@ export const updateTask = createServerFn({ method: "POST" })
   .handler(async ({ data: { id, updates } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
     await prisma.task.update({ where: { id }, data: updates });
+    await broadcast("tasks", "task-updates", { type: "task_updated", taskId: id });
     return true;
   });
 
@@ -157,7 +161,14 @@ export const deleteTask = createServerFn({ method: "POST" })
     return true;
   });
 
-import { put } from "@vercel/blob";
+import { v2 as cloudinary } from "cloudinary";
+import { broadcast } from "@/lib/ably.functions";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export const submitTaskProof = createServerFn({ method: "POST" })
   .validator(
@@ -166,13 +177,12 @@ export const submitTaskProof = createServerFn({ method: "POST" })
   .handler(async ({ data: { taskId, fileBase64, fileName, note } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
 
-    // Upload to Vercel Blob
-    const buffer = Buffer.from(fileBase64, "base64");
-    const path = `${auth.userId}/${taskId}/${Date.now()}-${fileName}`;
-
-    const blob = await put(path, buffer, {
-      access: "public",
-      token: process.env.BLOB_READ_WRITE_TOKEN, // Make sure we use the token
+    // Upload to Cloudinary
+    const base64Data = `data:image/jpeg;base64,${fileBase64}`;
+    const uploadResult = await cloudinary.uploader.upload(base64Data, {
+      folder: `workmonitor/${auth.userId}/${taskId}`,
+      public_id: `${Date.now()}-${fileName}`,
+      resource_type: "auto",
     });
 
     // Save proof to database
@@ -180,7 +190,7 @@ export const submitTaskProof = createServerFn({ method: "POST" })
       data: {
         task_id: taskId,
         uploaded_by: auth.userId,
-        image_url: blob.url,
+        image_url: uploadResult.secure_url,
         note: note,
       },
     });
@@ -191,7 +201,9 @@ export const submitTaskProof = createServerFn({ method: "POST" })
       data: { status: "completed", revision_note: null },
     });
 
-    return { success: true, url: blob.url };
+    await broadcast("tasks", "task-updates", { type: "proof_submitted", taskId });
+
+    return { success: true, url: uploadResult.secure_url };
   });
 
 export const fetchTaskComments = createServerFn({ method: "GET" })
@@ -208,9 +220,11 @@ export const addTaskComment = createServerFn({ method: "POST" })
   .validator((data: { taskId: string; body: string }) => data)
   .handler(async ({ data: { taskId, body } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
-    return await prisma.taskComment.create({
+    const comment = await prisma.taskComment.create({
       data: { task_id: taskId, body, author_id: auth.userId },
     });
+    await broadcast("tasks", `comments-${taskId}`, { type: "new_comment", commentId: comment.id });
+    return comment;
   });
 
 export const deleteTaskComment = createServerFn({ method: "POST" })
@@ -218,5 +232,13 @@ export const deleteTaskComment = createServerFn({ method: "POST" })
   .handler(async ({ data: id }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
     await prisma.taskComment.delete({ where: { id } });
+    
+    // We should also get the taskId to broadcast, but for now we broadcast to all if we can't.
+    // We can fetch the comment first to get the task_id.
+    const comment = await prisma.taskComment.findUnique({ where: { id } });
+    if (comment) {
+      await prisma.taskComment.delete({ where: { id } });
+      await broadcast("tasks", `comments-${comment.task_id}`, { type: "delete_comment", commentId: id });
+    }
     return true;
   });

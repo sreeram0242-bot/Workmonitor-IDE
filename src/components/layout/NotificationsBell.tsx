@@ -18,6 +18,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { fetchNotifications, markNotificationsRead, clearNotifications } from "@/lib/notify";
+import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
 interface NotificationRow {
   id: string;
@@ -72,10 +73,12 @@ export function NotificationsBell() {
   useEffect(() => {
     if (!user) return;
     reload();
-    const id = setInterval(reload, 5000); // Poll every 5s
-    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useRealtimeSubscription("notifications", `user-${user?.id}`, () => {
+    reload();
+  });
 
   // Re-render relative timestamps every 60s while dropdown is open
   useEffect(() => {
