@@ -10,8 +10,11 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
-    console.error(error);
-    return new Response(renderErrorPage(), {
+    const errString = error?.stack || error?.message || String(error) || "Internal Server Error";
+    console.error("Server function error:", errString);
+    
+    // Instead of swallowing into HTML without details, let's include the error!
+    return new Response(renderErrorPage(errString), {
       status: 500,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
