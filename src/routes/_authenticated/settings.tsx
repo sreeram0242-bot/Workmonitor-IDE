@@ -13,7 +13,6 @@ import {
   verifyPasscode,
   updatePasscode,
 } from "@/lib/settings.functions";
-import { put } from "@vercel/blob";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,

@@ -2407,20 +2407,7 @@ function AttachmentView({
   mine: boolean;
   onOpenImage?: (url: string) => void;
 }) {
-  const [url, setUrl] = useState<string>(att.url);
-  useEffect(() => {
-    let cancelled = false;
-    supabase.storage
-      .from("chat-attachments")
-      .createSignedUrl(att.path, 60 * 60 * 24)
-      .then(({ data }) => {
-        if (!cancelled && data?.signedUrl) setUrl(data.signedUrl);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [att.path]);
-
+  const url = att.url;
   if (att.kind === "image") {
     return (
       <button
