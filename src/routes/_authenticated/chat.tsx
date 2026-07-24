@@ -554,14 +554,19 @@ function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  const [openingDM, setOpeningDM] = useState<string | null>(null);
+
   async function openDM(otherId: string) {
     if (!user) return;
+    setOpeningDM(otherId);
     try {
       const id = await findOrCreateDM(user.id, otherId);
       await reloadConversations();
       setActiveId(id);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to open DM");
+    } finally {
+      setOpeningDM(null);
     }
   }
 
@@ -782,16 +787,23 @@ function ChatPage() {
                   <button
                     key={m.id}
                     onClick={() => openDM(m.id)}
-                    className="mb-0.5 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition-all hover:bg-accent/70"
+                    disabled={openingDM === m.id}
+                    className="mb-0.5 flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition-all hover:bg-accent/70 disabled:opacity-50"
                   >
                     <div className="relative">
-                      <Avatar
-                        name={m.full_name}
-                        admin={m.role === "admin"}
-                        size={36}
-                        url={m.avatar_url}
-                        online={onlineUsers.has(m.id)}
-                      />
+                      {openingDM === m.id ? (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-accent border-r-transparent" />
+                        </div>
+                      ) : (
+                        <Avatar
+                          name={m.full_name}
+                          admin={m.role === "admin"}
+                          size={36}
+                          url={m.avatar_url}
+                          online={onlineUsers.has(m.id)}
+                        />
+                      )}
                       {dmUnread > 0 && (
                         <span className="absolute -right-1 -top-1 flex h-2.5 w-2.5 items-center justify-center">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-70" />
