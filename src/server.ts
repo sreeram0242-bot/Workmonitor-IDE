@@ -53,13 +53,15 @@ export default {
       return await normalizeCatastrophicSsrResponse(response, request);
     } catch (error: any) {
       console.error(error);
-      if (request.url.includes("/_server")) {
-        return new Response(JSON.stringify({ error: error?.message || "Internal Server Error" }), {
+      const isApi = request.url.includes("_server") || request.url.includes("api") || request.headers.get("accept")?.includes("json");
+      const errString = error?.stack || error?.message || String(error) || "Internal Server Error";
+      if (isApi) {
+        return new Response(JSON.stringify({ error: errString }), {
           status: 500,
           headers: { "content-type": "application/json" }
         });
       }
-      return new Response(renderErrorPage(), {
+      return new Response(renderErrorPage(errString), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });

@@ -1,4 +1,5 @@
-export function renderErrorPage(): string {
+export function renderErrorPage(errorMsg?: string): string {
+  const displayError = errorMsg ? String(errorMsg) : "An unexpected error occurred. Please refresh or try again in a moment.";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -11,12 +12,14 @@ export function renderErrorPage(): string {
   h1 { font-size:1.5rem; margin:0 0 .5rem; }
   p { opacity:.75; margin:0 0 1.5rem; font-size:.95rem; }
   a { display:inline-block; padding:.6rem 1.2rem; background:#fff; color:#0F1B3D; border-radius:.5rem; text-decoration:none; font-weight:600; }
+  .err-msg { font-family: monospace; font-size: 0.8rem; text-align: left; background: #000; padding: 1rem; border-radius: 4px; color: #ff6b6b; word-break: break-all; margin-bottom: 1.5rem; }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Something went wrong</h1>
-    <p>An unexpected error occurred. Please refresh or try again in a moment.</p>
+    <p>An unexpected error occurred.</p>
+    <div class="err-msg">${displayError}</div>
     <a href="/">Reload</a>
   </div>
 </body>
