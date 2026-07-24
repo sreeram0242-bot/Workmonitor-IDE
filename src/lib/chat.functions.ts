@@ -443,7 +443,7 @@ export const fetchLastReadByMembers = createServerFn({ method: "GET" })
 export const fetchUnreadCounts = createServerFn({ method: "POST" })
   .validator((data: { conversationIds: string[]; lastRead: Record<string, string> }) => data)
   .handler(async ({ data: { conversationIds, lastRead } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const result: Record<string, number> = {};
     await Promise.all(
       conversationIds.map(async (cid) => {
@@ -451,7 +451,7 @@ export const fetchUnreadCounts = createServerFn({ method: "POST" })
         const count = await prisma.message.count({
           where: {
             conversation_id: cid,
-            sender_id: { not: auth.userId },
+            sender_id: { not: authResult.userId },
             created_at: { gt: since },
           },
         });
@@ -464,7 +464,7 @@ export const fetchUnreadCounts = createServerFn({ method: "POST" })
 export const renameGroup = createServerFn({ method: "POST" })
   .validator((data: { conversationId: string; name: string }) => data)
   .handler(async ({ data: { conversationId, name } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { name },
@@ -475,7 +475,7 @@ export const renameGroup = createServerFn({ method: "POST" })
 export const addGroupMembers = createServerFn({ method: "POST" })
   .validator((data: { conversationId: string; userIds: string[] }) => data)
   .handler(async ({ data: { conversationId, userIds } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (userIds.length === 0) return true;
     await prisma.conversationMember.createMany({
       data: userIds.map((id) => ({ conversation_id: conversationId, user_id: id })),
@@ -487,7 +487,7 @@ export const addGroupMembers = createServerFn({ method: "POST" })
 export const removeGroupMember = createServerFn({ method: "POST" })
   .validator((data: { conversationId: string; userId: string }) => data)
   .handler(async ({ data: { conversationId, userId } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.conversationMember.deleteMany({
       where: { conversation_id: conversationId, user_id: userId },
     });

@@ -59,9 +59,9 @@ export const verifyPasscode = createServerFn({ method: "POST" })
 export const updatePasscode = createServerFn({ method: "POST" })
   .validator((pin: string) => pin)
   .handler(async ({ data: pin }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.profile.update({
-      where: { id: auth.userId },
+      where: { id: authResult.userId },
       data: { passcode_hash: pin },
     });
     return true;
