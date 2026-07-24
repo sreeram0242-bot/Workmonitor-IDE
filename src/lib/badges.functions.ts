@@ -40,21 +40,24 @@ export const setMemberBadge = createServerFn({ method: "POST" })
       }
     }
 
-    let adminClient;
+    let fallbackToAnon = false;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      adminClient = supabaseAdmin;
-    } catch (e) {
-      console.warn("Service role key missing, using fallback for badge update");
-    }
-
-    if (adminClient) {
-      const { error } = await adminClient
+      const { error } = await supabaseAdmin
         .from("profiles")
         .update({ badge } as any)
         .eq("id", data.user_id);
       if (error) throw new Response(error.message, { status: 400 });
-    } else {
+    } catch (e: any) {
+      if (e.message?.includes("Missing Supabase environment variable(s)")) {
+        console.warn("Service role key missing, using fallback for badge update");
+        fallbackToAnon = true;
+      } else {
+        throw e;
+      }
+    }
+
+    if (fallbackToAnon) {
       // Fallback: try to update using current user's token. 
       // If RLS prevents admins from updating profiles, this might fail, but it prevents 500 crashes
       const { error } = await context.supabase
