@@ -46,7 +46,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
       createdUser = authData.user;
       
       await supabaseAdmin.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
-      await supabaseAdmin.from("profiles").update({ full_name: data.full_name, position: data.position }).eq("id", createdUser.id);
+      await supabaseAdmin.from("profiles").upsert({ id: createdUser.id, full_name: data.full_name, position: data.position });
       
       return { id: createdUser.id };
     } catch (e: any) {
