@@ -1,18 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { getAuth } from "@clerk/tanstack-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 
-function getReqOrThrow() {
-  const req = getRequest();
-  if (!req) throw new Error("No request");
-  return req;
-}
-
-async function getAuthOrThrow(req: Request) {
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
-  return auth;
+async function getAuthOrThrow() {
+  try {
+    const authResult = await auth();
+    if (!authResult.userId) throw new Error("Unauthorized (no userId)");
+    return authResult;
+  } catch (e) {
+    console.error("getAuthOrThrow failed:", e);
+    throw e;
+  }
 }
 
 export const updateProfile = createServerFn({ method: "POST" })
@@ -25,29 +23,34 @@ export const updateProfile = createServerFn({ method: "POST" })
     }) => updates,
   )
   .handler(async ({ data: updates }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.profile.update({
-      where: { id: auth.userId },
+      where: { id: authResult.userId },
       data: updates,
     });
     return true;
   });
 
-export const checkPasscode = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
-  const profile = await prisma.profile.findUnique({
-    where: { id: auth.userId },
-    select: { passcode_hash: true },
-  });
-  return !!profile?.passcode_hash;
+export const checkPasscode = createServerFn({ method: "POST" }).handler(async () => {
+  try {
+    const authResult = await getAuthOrThrow();
+    const profile = await prisma.profile.findUnique({
+      where: { id: authResult.userId },
+      select: { passcode_hash: true },
+    });
+    return !!profile?.passcode_hash;
+  } catch (e) {
+    console.error("checkPasscode error:", e);
+    throw e;
+  }
 });
 
 export const verifyPasscode = createServerFn({ method: "POST" })
   .validator((pin: string) => pin)
   .handler(async ({ data: pin }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const profile = await prisma.profile.findUnique({
-      where: { id: auth.userId },
+      where: { id: authResult.userId },
       select: { passcode_hash: true },
     });
     return profile?.passcode_hash === pin;

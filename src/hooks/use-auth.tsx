@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { useUser } from "@clerk/tanstack-start";
+import { useUser } from "@clerk/tanstack-react-start";
 import { getMyProfile } from "@/lib/auth.functions";
 
 export type AppRole = "admin" | "user";

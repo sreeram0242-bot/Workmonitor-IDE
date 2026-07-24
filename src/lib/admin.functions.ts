@@ -1,8 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getAuth, clerkClient } from "@clerk/tanstack-start/server";
-import { getRequest } from "@tanstack/react-start/server";
+import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
+
+async function getAuthOrThrow() {
+  const authResult = await auth();
+  if (!authResult.userId) throw new Error("Unauthorized");
+  return authResult;
+}
 
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -15,13 +20,10 @@ const createUserSchema = z.object({
 export const createTeamMember = createServerFn({ method: "POST" })
   .validator((data: unknown) => createUserSchema.parse(data))
   .handler(async ({ data }) => {
-    const req = getRequest();
-    if (!req) throw new Error("No request");
-    const auth = await getAuth(req);
-    if (!auth.userId) throw new Error("Unauthorized");
+    const authResult = await getAuthOrThrow();
 
-    const callerRole = await prisma.userRole.findUnique({
-      where: { user_id: auth.userId },
+    const callerRole = await prisma.userRole.findFirst({
+      where: { user_id: authResult.userId },
       select: { role: true },
     });
     if (callerRole?.role !== "admin") {
@@ -38,11 +40,15 @@ export const createTeamMember = createServerFn({ method: "POST" })
         publicMetadata: { role: data.role },
       });
 
-      await prisma.userRole.upsert({
-        where: { user_id_role: { user_id: user.id, role: data.role } },
-        update: { role: data.role },
-        create: { user_id: user.id, role: data.role },
-      });
+      // Prisma upsert needs a unique field. We don't have user_id_role unique constraint,
+      // so we use findFirst and update/create manually
+      const existingRole = await prisma.userRole.findFirst({ where: { user_id: user.id } });
+      if (existingRole) {
+        await prisma.userRole.update({ where: { id: existingRole.id }, data: { role: data.role } });
+      } else {
+        await prisma.userRole.create({ data: { user_id: user.id, role: data.role } });
+      }
+      
       await prisma.profile.upsert({
         where: { id: user.id },
         update: { full_name: data.full_name, position: data.position },
@@ -58,19 +64,16 @@ export const createTeamMember = createServerFn({ method: "POST" })
 export const deleteTeamMember = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ user_id: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const req = getRequest();
-    if (!req) throw new Error("No request");
-    const auth = await getAuth(req);
-    if (!auth.userId) throw new Error("Unauthorized");
+    const authResult = await getAuthOrThrow();
 
-    const callerRole = await prisma.userRole.findUnique({
-      where: { user_id: auth.userId },
+    const callerRole = await prisma.userRole.findFirst({
+      where: { user_id: authResult.userId },
       select: { role: true },
     });
     if (callerRole?.role !== "admin") {
       throw new Error("Forbidden");
     }
-    if (data.user_id === auth.userId) {
+    if (data.user_id === authResult.userId) {
       throw new Error("Cannot delete yourself");
     }
 
@@ -90,13 +93,10 @@ export const deleteTeamMember = createServerFn({ method: "POST" })
 export const resetUserPasscode = createServerFn({ method: "POST" })
   .validator((data: { targetUserId: string }) => data)
   .handler(async ({ data: { targetUserId } }) => {
-    const req = getRequest();
-    if (!req) throw new Error("No request");
-    const auth = await getAuth(req);
-    if (!auth.userId) throw new Error("Unauthorized");
+    const authResult = await getAuthOrThrow();
 
-    const callerRole = await prisma.userRole.findUnique({
-      where: { user_id: auth.userId },
+    const callerRole = await prisma.userRole.findFirst({
+      where: { user_id: authResult.userId },
       select: { role: true },
     });
     if (callerRole?.role !== "admin") {
@@ -105,20 +105,17 @@ export const resetUserPasscode = createServerFn({ method: "POST" })
 
     await prisma.profile.update({
       where: { id: targetUserId },
-      data: { passcode: null },
+      data: { passcode: null, passcode_hash: null },
     });
 
     return true;
   });
 
 export const fetchDevStats = createServerFn({ method: "GET" }).handler(async () => {
-  const req = getRequest();
-  if (!req) throw new Error("No request");
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
+  const authResult = await getAuthOrThrow();
 
   const callerProfile = await prisma.profile.findUnique({
-    where: { id: auth.userId },
+    where: { id: authResult.userId },
   });
   if (callerProfile?.badge !== "Developer") {
     throw new Error("Forbidden");

@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { getAuth } from "@clerk/tanstack-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
 import { broadcast } from "@/lib/ably.functions";
@@ -8,22 +7,17 @@ import { broadcast } from "@/lib/ably.functions";
 // cloudinary config is applied lazily inside handlers (server-only)
 
 
-function getReqOrThrow() {
-  const req = getRequest();
-  if (!req) throw new Error("No request");
-  return req;
-}
 
-async function getAuthOrThrow(req: Request) {
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
-  return auth;
+async function getAuthOrThrow() {
+  const authResult = await auth();
+  if (!authResult.userId) throw new Error("Unauthorized");
+  return authResult;
 }
 
 export const fetchMyConversations = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   const memberships = await prisma.conversationMember.findMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
     select: { conversation_id: true },
   });
   const ids = memberships.map((m) => m.conversation_id);
@@ -38,7 +32,7 @@ export const fetchMyConversations = createServerFn({ method: "GET" }).handler(as
 export const fetchConversationMembers = createServerFn({ method: "GET" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const members = await prisma.conversationMember.findMany({
       where: { conversation_id: conversationId },
       select: { user_id: true },
@@ -49,7 +43,7 @@ export const fetchConversationMembers = createServerFn({ method: "GET" })
 export const fetchMessages = createServerFn({ method: "GET" })
   .validator((data: { conversationId: string; limit: number }) => data)
   .handler(async ({ data: { conversationId, limit } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const messages = await prisma.message.findMany({
       where: { conversation_id: conversationId },
       orderBy: { created_at: "desc" },
@@ -61,7 +55,7 @@ export const fetchMessages = createServerFn({ method: "GET" })
 export const fetchOlderMessages = createServerFn({ method: "GET" })
   .validator((data: { conversationId: string; beforeIso: string; limit: number }) => data)
   .handler(async ({ data: { conversationId, beforeIso, limit } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const messages = await prisma.message.findMany({
       where: {
         conversation_id: conversationId,
@@ -76,7 +70,7 @@ export const fetchOlderMessages = createServerFn({ method: "GET" })
 export const fetchMessagesByIds = createServerFn({ method: "GET" })
   .validator((ids: string[]) => ids)
   .handler(async ({ data: ids }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (ids.length === 0) return [];
     return await prisma.message.findMany({
       where: { id: { in: ids } },
@@ -98,13 +92,13 @@ export const sendMessage = createServerFn({ method: "POST" })
     async ({
       data: { conversationId, content, attachments, replyTo, forwardedFrom, mentions },
     }) => {
-      const auth = await getAuthOrThrow(getReqOrThrow());
+      const authResult = await getAuthOrThrow();
 
       // Convert undefined to null for Prisma JSON or fields
       const newMsg = await prisma.message.create({
         data: {
           conversation_id: conversationId,
-          sender_id: auth.userId,
+          sender_id: authResult.userId,
           content,
           attachments: attachments ?? [],
           reply_to: replyTo ?? null,
@@ -119,13 +113,13 @@ export const sendMessage = createServerFn({ method: "POST" })
         const apiKey = process.env.VITE_ONESIGNAL_API_KEY;
         if (appId && apiKey) {
           const members = await prisma.conversationMember.findMany({
-            where: { conversation_id: conversationId, user_id: { not: auth.userId } },
+            where: { conversation_id: conversationId, user_id: { not: authResult.userId } },
             select: { user_id: true },
           });
           const targetIds = members.map((m) => m.user_id);
 
           if (targetIds.length > 0) {
-            const profile = await prisma.profile.findUnique({ where: { id: auth.userId } });
+            const profile = await prisma.profile.findUnique({ where: { id: authResult.userId } });
             const senderName = profile?.full_name || "Someone";
 
             await fetch("https://onesignal.com/api/v1/notifications", {
@@ -162,7 +156,7 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
       data,
   )
   .handler(async ({ data: { conversationId, fileBase64, fileName, mimeType } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
 
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -172,7 +166,7 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
     const base64Data = `data:${mimeType};base64,${fileBase64}`;
     const uploadResult = await cloudinary.uploader.upload(base64Data, {
       folder: `workmonitor/chat/${conversationId}`,
-      public_id: `${auth.userId}-${Date.now()}-${fileName}`,
+      public_id: `${authResult.userId}-${Date.now()}-${fileName}`,
       resource_type: "auto",
     });
 
@@ -197,8 +191,8 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
 export const findOrCreateDM = createServerFn({ method: "POST" })
   .validator((otherUserId: string) => otherUserId)
   .handler(async ({ data: otherUserId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
-    const currentUserId = auth.userId;
+    const authResult = await getAuthOrThrow();
+    const currentUserId = authResult.userId;
 
     const mine = await prisma.conversationMember.findMany({
       where: { user_id: currentUserId },
@@ -235,12 +229,12 @@ export const findOrCreateDM = createServerFn({ method: "POST" })
 export const createGroup = createServerFn({ method: "POST" })
   .validator((data: { name: string; memberIds: string[] }) => data)
   .handler(async ({ data: { name, memberIds } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const conv = await prisma.conversation.create({
       data: { is_group: true, name },
     });
 
-    const ids = Array.from(new Set([auth.userId, ...memberIds]));
+    const ids = Array.from(new Set([authResult.userId, ...memberIds]));
     await prisma.conversationMember.createMany({
       data: ids.map((id) => ({ conversation_id: conv.id, user_id: id })),
     });
@@ -255,7 +249,7 @@ export const createGroup = createServerFn({ method: "POST" })
 export const editMessage = createServerFn({ method: "POST" })
   .validator((data: { messageId: string; content: string }) => data)
   .handler(async ({ data: { messageId, content } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const message = await prisma.message.update({
       where: { id: messageId },
       data: { content, edited_at: new Date() },
@@ -267,7 +261,7 @@ export const editMessage = createServerFn({ method: "POST" })
 export const deleteMessage = createServerFn({ method: "POST" })
   .validator((messageId: string) => messageId)
   .handler(async ({ data: messageId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const message = await prisma.message.update({
       where: { id: messageId },
       data: { content: "", attachments: [], deleted_at: new Date() },
@@ -279,10 +273,10 @@ export const deleteMessage = createServerFn({ method: "POST" })
 export const deleteMessageForMe = createServerFn({ method: "POST" })
   .validator((messageId: string) => messageId)
   .handler(async ({ data: messageId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     try {
       await (prisma as any).hiddenMessage.create({
-        data: { message_id: messageId, user_id: auth.userId },
+        data: { message_id: messageId, user_id: authResult.userId },
       });
     } catch {
       /* ignore */
@@ -293,9 +287,9 @@ export const deleteMessageForMe = createServerFn({ method: "POST" })
 export const leaveConversation = createServerFn({ method: "POST" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.conversationMember.deleteMany({
-      where: { conversation_id: conversationId, user_id: auth.userId },
+      where: { conversation_id: conversationId, user_id: authResult.userId },
     });
     return true;
   });
@@ -303,13 +297,13 @@ export const leaveConversation = createServerFn({ method: "POST" })
 export const toggleMuteConversation = createServerFn({ method: "POST" })
   .validator((data: { conversationId: string; mute: boolean }) => data)
   .handler(async ({ data: { conversationId, mute } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const members = await prisma.conversationMember.findMany({
-      where: { conversation_id: conversationId, user_id: auth.userId },
+      where: { conversation_id: conversationId, user_id: authResult.userId },
     });
     if (members.length > 0) {
       await prisma.conversationMember.updateMany({
-        where: { conversation_id: conversationId, user_id: auth.userId },
+        where: { conversation_id: conversationId, user_id: authResult.userId },
         data: { muted_at: mute ? new Date() : null },
       });
     }
@@ -317,9 +311,9 @@ export const toggleMuteConversation = createServerFn({ method: "POST" })
   });
 
 export const fetchMuteMap = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   const memberships = await prisma.conversationMember.findMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
     select: { conversation_id: true, muted_at: true },
   });
   const map: Record<string, boolean> = {};
@@ -330,12 +324,12 @@ export const fetchMuteMap = createServerFn({ method: "GET" }).handler(async () =
 export const togglePinMessage = createServerFn({ method: "POST" })
   .validator((data: { messageId: string; pinned: boolean }) => data)
   .handler(async ({ data: { messageId, pinned } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.message.update({
       where: { id: messageId },
       data: {
         pinned_at: pinned ? new Date() : null,
-        pinned_by: pinned ? auth.userId : null,
+        pinned_by: pinned ? authResult.userId : null,
       },
     });
     return true;
@@ -344,7 +338,7 @@ export const togglePinMessage = createServerFn({ method: "POST" })
 export const fetchPinnedMessages = createServerFn({ method: "GET" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     return await prisma.message.findMany({
       where: { conversation_id: conversationId, pinned_at: { not: null } },
       orderBy: { pinned_at: "desc" },
@@ -354,7 +348,7 @@ export const fetchPinnedMessages = createServerFn({ method: "GET" })
 export const fetchReactions = createServerFn({ method: "GET" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const msgs = await prisma.message.findMany({
       where: { conversation_id: conversationId },
       select: { id: true },
@@ -369,23 +363,23 @@ export const fetchReactions = createServerFn({ method: "GET" })
 export const toggleReaction = createServerFn({ method: "POST" })
   .validator((data: { messageId: string; emoji: string; has: boolean }) => data)
   .handler(async ({ data: { messageId, emoji, has } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (has) {
       await prisma.messageReaction.deleteMany({
-        where: { message_id: messageId, user_id: auth.userId, emoji },
+        where: { message_id: messageId, user_id: authResult.userId, emoji },
       });
     } else {
       await prisma.messageReaction.create({
-        data: { message_id: messageId, user_id: auth.userId, emoji },
+        data: { message_id: messageId, user_id: authResult.userId, emoji },
       });
     }
     return true;
   });
 
 export const fetchStarredIds = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   const starred = await prisma.starredMessage.findMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
     select: { message_id: true },
   });
   return starred.map((s) => s.message_id);
@@ -394,14 +388,14 @@ export const fetchStarredIds = createServerFn({ method: "GET" }).handler(async (
 export const toggleStar = createServerFn({ method: "POST" })
   .validator((data: { messageId: string; starred: boolean }) => data)
   .handler(async ({ data: { messageId, starred } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (starred) {
       await prisma.starredMessage.deleteMany({
-        where: { message_id: messageId, user_id: auth.userId },
+        where: { message_id: messageId, user_id: authResult.userId },
       });
     } else {
       await prisma.starredMessage.create({
-        data: { message_id: messageId, user_id: auth.userId },
+        data: { message_id: messageId, user_id: authResult.userId },
       });
     }
     return true;
@@ -410,18 +404,18 @@ export const toggleStar = createServerFn({ method: "POST" })
 export const markConversationRead = createServerFn({ method: "POST" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     await prisma.conversationMember.updateMany({
-      where: { conversation_id: conversationId, user_id: auth.userId },
+      where: { conversation_id: conversationId, user_id: authResult.userId },
       data: { last_read_at: new Date() },
     });
     return true;
   });
 
 export const fetchLastReadMap = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   const memberships = await prisma.conversationMember.findMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
     select: { conversation_id: true, last_read_at: true },
   });
   const map: Record<string, string> = {};
@@ -434,7 +428,7 @@ export const fetchLastReadMap = createServerFn({ method: "GET" }).handler(async 
 export const fetchLastReadByMembers = createServerFn({ method: "GET" })
   .validator((conversationId: string) => conversationId)
   .handler(async ({ data: conversationId }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     const memberships = await prisma.conversationMember.findMany({
       where: { conversation_id: conversationId },
       select: { user_id: true, last_read_at: true },

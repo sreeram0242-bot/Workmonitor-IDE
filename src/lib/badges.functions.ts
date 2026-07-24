@@ -1,19 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { getAuth } from "@clerk/tanstack-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
+import { broadcast } from "@/lib/ably.functions";
+import { triggerNotification } from "@/lib/notify.functions";
 import { z } from "zod";
 
-function getReqOrThrow() {
-  const req = getRequest();
-  if (!req) throw new Error("No request");
-  return req;
-}
 
-async function getAuthOrThrow(req: Request) {
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
-  return auth;
+async function getAuthOrThrow() {
+  const authResult = await auth();
+  if (!authResult.userId) throw new Error("Unauthorized");
+  return authResult;
 }
 
 export const setMemberBadge = createServerFn({ method: "POST" })
@@ -26,9 +22,9 @@ export const setMemberBadge = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
-    const roleRow = await prisma.userRole.findUnique({
-      where: { id: auth.userId },
+    const authResult = await getAuthOrThrow();
+    const roleRow = await prisma.userRole.findFirst({
+      where: { user_id: authResult.userId },
       select: { role: true },
     });
 
@@ -41,7 +37,7 @@ export const setMemberBadge = createServerFn({ method: "POST" })
     // Developer badge is protected: only an existing Developer can grant or revoke it.
     if (badge === "Developer" || badge?.toLowerCase() === "developer") {
       const me = await prisma.profile.findUnique({
-        where: { id: auth.userId },
+        where: { id: authResult.userId },
         select: { badge: true },
       });
       if (me?.badge !== "Developer") {
@@ -55,7 +51,7 @@ export const setMemberBadge = createServerFn({ method: "POST" })
     });
     if (target?.badge === "Developer" && badge !== "Developer") {
       const me = await prisma.profile.findUnique({
-        where: { id: auth.userId },
+        where: { id: authResult.userId },
         select: { badge: true },
       });
       if (me?.badge !== "Developer") {

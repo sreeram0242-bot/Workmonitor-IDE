@@ -1,19 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { getAuth } from "@clerk/tanstack-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/ably.functions";
 
-function getReqOrThrow() {
-  const req = getRequest();
-  if (!req) throw new Error("No request");
-  return req;
-}
-
-async function getAuthOrThrow(req: Request) {
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
-  return auth;
+async function getAuthOrThrow() {
+  const authResult = await auth();
+  if (!authResult.userId) throw new Error("Unauthorized");
+  return authResult;
 }
 
 export type NotifyType = "task" | "message" | "mention" | "team" | string;
@@ -28,7 +21,7 @@ export interface NotifyPayload {
 export const serverSendNotifications = createServerFn({ method: "POST" })
   .validator((items: NotifyPayload[]) => items)
   .handler(async ({ data: items }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (items.length === 0) return true;
 
     const ids = Array.from(new Set(items.map((i) => i.user_id)));
@@ -100,9 +93,9 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
   });
 
 export const fetchNotifications = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   const notifications = await prisma.notification.findMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
     orderBy: { created_at: "desc" },
     take: 50,
   });
@@ -112,7 +105,7 @@ export const fetchNotifications = createServerFn({ method: "GET" }).handler(asyn
 export const markNotificationsRead = createServerFn({ method: "POST" })
   .validator((data: { id?: string }) => data)
   .handler(async ({ data: { id } }) => {
-    const auth = await getAuthOrThrow(getReqOrThrow());
+    const authResult = await getAuthOrThrow();
     if (id) {
       await prisma.notification.update({
         where: { id },
@@ -120,7 +113,7 @@ export const markNotificationsRead = createServerFn({ method: "POST" })
       });
     } else {
       await prisma.notification.updateMany({
-        where: { user_id: auth.userId, read: false },
+        where: { user_id: authResult.userId, read: false },
         data: { read: true },
       });
     }
@@ -128,9 +121,9 @@ export const markNotificationsRead = createServerFn({ method: "POST" })
   });
 
 export const clearNotifications = createServerFn({ method: "POST" }).handler(async () => {
-  const auth = await getAuthOrThrow(getReqOrThrow());
+  const authResult = await getAuthOrThrow();
   await prisma.notification.deleteMany({
-    where: { user_id: auth.userId },
+    where: { user_id: authResult.userId },
   });
   return true;
 });

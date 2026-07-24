@@ -1,30 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { getAuth } from "@clerk/tanstack-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 
 export const getMyProfile = createServerFn({ method: "GET" }).handler(async () => {
-  const req = getRequest();
-  if (!req) return null;
-  const auth = await getAuth(req);
-  if (!auth.userId) return null;
+  let authResult;
+  try {
+    authResult = await auth();
+  } catch (e) {
+    console.error("Clerk auth error:", e);
+    return null;
+  }
+  if (!authResult?.userId) return null;
 
   // Find user role
-  let roleRow = await prisma.userRole.findUnique({
-    where: { id: auth.userId }, // Wait, UserRole pk is id? Or user_id?
+  let roleRow = await prisma.userRole.findFirst({
+    where: { user_id: authResult.userId },
   });
-
-  if (!roleRow) {
-    // Check if by user_id
-    const byUserId = await prisma.userRole.findFirst({
-      where: { user_id: auth.userId },
-    });
-    roleRow = byUserId;
-  }
 
   // Find profile
   const profile = await prisma.profile.findUnique({
-    where: { id: auth.userId },
+    where: { id: authResult.userId },
   });
 
   return {

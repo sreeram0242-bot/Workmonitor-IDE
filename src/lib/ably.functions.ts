@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getAuth } from "@clerk/tanstack-start/server";
-import { getRequest } from "@tanstack/react-start/server";
+import { auth } from "@clerk/tanstack-react-start/server";
 
 // Lazy-init the Ably REST client so it only runs on the server
 let _ablyRest: any = null;
@@ -13,15 +12,12 @@ function getAblyRest() {
 }
 
 export const getAblyToken = createServerFn({ method: "POST" }).handler(async () => {
-  const req = getRequest();
-  if (!req) throw new Error("No request found");
-
-  const auth = await getAuth(req);
-  if (!auth.userId) throw new Error("Unauthorized");
+  const authResult = await auth();
+  if (!authResult.userId) throw new Error("Unauthorized");
 
   try {
     const tokenRequestData = await getAblyRest().auth.createTokenRequest({
-      clientId: auth.userId,
+      clientId: authResult.userId,
     });
     return tokenRequestData;
   } catch (e: any) {

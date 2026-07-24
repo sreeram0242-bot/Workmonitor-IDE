@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useClerk } from "@clerk/tanstack-start";
+import { useClerk } from "@clerk/tanstack-react-start";
 import { Logo } from "@/components/brand/Logo";
 import { toast } from "sonner";
 import { checkPasscode, verifyPasscode, updatePasscode } from "@/lib/settings.functions";

@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster, toast } from "sonner";
-import { ClerkProvider } from "@clerk/tanstack-start";
+import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { AuthProvider } from "@/hooks/use-auth";
 
 import appCss from "../styles.css?url";

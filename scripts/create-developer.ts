@@ -13,12 +13,27 @@ const prisma = new PrismaClient({ adapter });
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 async function main() {
-  const email = "sree@gmail.com";
+  const oldEmail = "sree@gmail.com";
+  const newEmail = "sreeram02420@gmail.com";
   const password = "Sreeram@007!";
   
-  console.log("Checking if user already exists in Clerk...");
-  let users = await clerk.users.getUserList({ emailAddress: [email] });
-  let user = users.data[0];
+  console.log(`Checking for old user ${oldEmail}...`);
+  let oldUsers = await clerk.users.getUserList({ emailAddress: [oldEmail] });
+  if (oldUsers.data.length > 0) {
+    for (const u of oldUsers.data) {
+      console.log(`Deleting old user from Clerk: ${u.id}`);
+      await clerk.users.deleteUser(u.id);
+      console.log(`Deleting old user from Database...`);
+      await prisma.profile.deleteMany({ where: { id: u.id } });
+      await prisma.userRole.deleteMany({ where: { id: u.id } });
+    }
+  } else {
+    console.log(`Old user ${oldEmail} not found in Clerk.`);
+  }
+
+  console.log(`\nChecking if new user ${newEmail} already exists...`);
+  let newUsers = await clerk.users.getUserList({ emailAddress: [newEmail] });
+  let user = newUsers.data[0];
 
   if (user) {
     console.log(`User already exists in Clerk with ID: ${user.id}. Updating password...`);
@@ -26,7 +41,7 @@ async function main() {
   } else {
     console.log("Creating new user in Clerk...");
     user = await clerk.users.createUser({
-      emailAddress: [email],
+      emailAddress: [newEmail],
       password: password,
       firstName: "Sreeram",
       lastName: "Developer",
@@ -35,7 +50,7 @@ async function main() {
     console.log(`User created in Clerk with ID: ${user.id}`);
   }
 
-  console.log("Upserting profile and role in database...");
+  console.log("Upserting profile and role in database for new user...");
   await prisma.profile.upsert({
     where: { id: user.id },
     create: {
@@ -61,7 +76,7 @@ async function main() {
     }
   });
 
-  console.log("Done! You can now log in with the new credentials.");
+  console.log("Done! You can now log in with sreeram02420@gmail.com.");
 }
 
 main()

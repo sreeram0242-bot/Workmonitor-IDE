@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Switch } from "@/components/ui/switch";
-import { UserProfile, useClerk } from "@clerk/tanstack-start";
+import { UserProfile, useClerk } from "@clerk/tanstack-react-start";
 import {
   updateProfile,
   checkPasscode,
