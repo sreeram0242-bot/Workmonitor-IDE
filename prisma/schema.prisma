@@ -174,3 +174,13 @@ model Notification {
   read       Boolean  @default(false)
   created_at DateTime @default(now())
 }
+
+model Reminder {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  remind_at  DateTime
+  notified   Boolean  @default(false)
+  created_at DateTime @default(now())
+}
+

@@ -19,6 +19,8 @@ import {
   fetchTaskComments as serverFetchTaskComments,
   addTaskComment as serverAddTaskComment,
   deleteTaskComment as serverDeleteTaskComment,
+  fetchReminders as serverFetchReminders,
+  addReminder as serverAddReminder,
 } from "./tasks.functions";
 
 export type TaskStatus = "pending" | "completed" | "approved" | "revision";
@@ -193,7 +195,6 @@ export async function deleteTaskComment(id: string) {
   return await serverDeleteTaskComment({ data: id });
 }
 
-// Reminders placeholder
 export interface ReminderRow {
   id: string;
   user_id: string;
@@ -202,9 +203,13 @@ export interface ReminderRow {
   notified: boolean;
   created_at: string | Date;
 }
+
 export async function fetchReminders(): Promise<ReminderRow[]> {
-  return [];
+  return (await serverFetchReminders()) as any[];
 }
+
 export async function addReminder(title: string, remindAt: Date): Promise<ReminderRow | null> {
-  return null;
+  return (await serverAddReminder({
+    data: { title, remindAt: remindAt.toISOString() },
+  })) as any;
 }

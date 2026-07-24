@@ -239,3 +239,24 @@ export const deleteTaskComment = createServerFn({ method: "POST" })
     }
     return true;
   });
+
+export const fetchReminders = createServerFn({ method: "GET" }).handler(async () => {
+  const authResult = await getAuthOrThrow();
+  return await prisma.reminder.findMany({
+    where: { user_id: authResult.userId },
+    orderBy: { remind_at: "asc" },
+  });
+});
+
+export const addReminder = createServerFn({ method: "POST" })
+  .validator((data: { title: string; remindAt: string }) => data)
+  .handler(async ({ data: { title, remindAt } }) => {
+    const authResult = await getAuthOrThrow();
+    return await prisma.reminder.create({
+      data: {
+        title,
+        remind_at: new Date(remindAt),
+        user_id: authResult.userId,
+      },
+    });
+  });
