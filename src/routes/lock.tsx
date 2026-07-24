@@ -82,7 +82,10 @@ function LockPage() {
   }, [busy, success, mode, firstPin]);
 
   function finish() {
-    if (user) sessionStorage.setItem(`wm_unlocked:${user.id}`, "1");
+    if (user) {
+      localStorage.setItem(`wm_unlocked:${user.id}`, "1");
+      localStorage.setItem(`wm_last_active:${user.id}`, String(Date.now()));
+    }
     navigate({ to: redirect || "/", replace: true });
   }
 
@@ -96,7 +99,7 @@ function LockPage() {
     try {
       await updatePasscode({ data: "" });
     } catch {}
-    if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
+    if (user) localStorage.removeItem(`wm_unlocked:${user.id}`);
     await clerk.signOut();
     navigate({ to: "/auth", replace: true });
   }
@@ -267,8 +270,9 @@ function LockPage() {
                 key={idx}
                 type="button"
                 disabled={!k || busy}
-                onClick={() => {
-                  if (!k) return;
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  if (!k || busy) return;
                   setPressedKey(idx);
                   setTimeout(() => setPressedKey((p) => (p === idx ? null : p)), 220);
                   if (k === "reset") {
@@ -283,10 +287,12 @@ function LockPage() {
                     setPin((p) => p.slice(0, -1));
                     return;
                   }
-                  if (pin.length >= 4) return;
-                  const next = (pin + k).slice(0, 4);
-                  setPin(next);
-                  if (next.length === 4) submit(next);
+                  setPin((p) => {
+                    if (p.length >= 4) return p;
+                    const next = (p + k).slice(0, 4);
+                    if (next.length === 4) setTimeout(() => submit(next), 0);
+                    return next;
+                  });
                 }}
                 className={`h-14 rounded-2xl font-medium transition-all duration-150 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 ${
                   k === "reset"
@@ -313,7 +319,7 @@ function LockPage() {
             </button>
             <button
               onClick={async () => {
-                if (user) sessionStorage.removeItem(`wm_unlocked:${user.id}`);
+                if (user) localStorage.removeItem(`wm_unlocked:${user.id}`);
                 await clerk.signOut();
                 navigate({ to: "/auth" });
               }}

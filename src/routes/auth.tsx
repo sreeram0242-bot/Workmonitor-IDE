@@ -430,6 +430,30 @@ function AuthPage() {
     }
   }, [isLoaded, userId, navigate]);
 
+  // Fix Clerk's submit button accessibility during loading state
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const btn = document.querySelector(".cl-formButtonPrimary");
+      if (btn) {
+        const isLoading = btn.hasAttribute("data-loading");
+        if (isLoading && btn.getAttribute("aria-busy") !== "true") {
+          btn.setAttribute("aria-busy", "true");
+          btn.setAttribute("aria-label", "Signing in, please wait...");
+        } else if (!isLoading && btn.hasAttribute("aria-busy")) {
+          btn.removeAttribute("aria-busy");
+          btn.removeAttribute("aria-label");
+        }
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-loading", "class", "disabled"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-[#fafbfc] animate-fade-in" style={SANS}>
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[56%_44%]">
