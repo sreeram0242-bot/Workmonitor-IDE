@@ -1,1 +1,0 @@
-import{S as e,g as t}from"./dist-B-RUibxW.js";import{l as n,n as r,s as i}from"./index-DbRfVgxH.js";var a=e(t());function o(){let{role:e}=r();return e&&e!==`admin`?(0,a.jsx)(n,{to:`/app`}):(0,a.jsx)(i,{})}export{o as component};
