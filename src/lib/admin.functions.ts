@@ -30,7 +30,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       // Accessing a property triggers the proxy and throws if key is missing
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      const { data: authData, error } = await supabaseAdmin.auth.admin.createUser({
         email: data.email,
         password: data.password,
         email_confirm: true,
@@ -40,10 +40,10 @@ export const createTeamMember = createServerFn({ method: "POST" })
           role: data.role,
         },
       });
-      if (error || !data.user) {
+      if (error || !authData.user) {
         throw new Response(error?.message ?? "Failed to create user", { status: 400 });
       }
-      createdUser = data.user;
+      createdUser = authData.user;
       
       await supabaseAdmin.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
       await supabaseAdmin.from("profiles").update({ full_name: data.full_name, position: data.position }).eq("id", createdUser.id);
@@ -66,17 +66,17 @@ export const createTeamMember = createServerFn({ method: "POST" })
         process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
         { auth: { persistSession: false } }
       );
-      const { data, error } = await supabaseAnon.auth.signUp({
+      const { data: authData, error } = await supabaseAnon.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           data: { full_name: data.full_name, position: data.position, role: data.role }
         }
       });
-      if (error || !data.user) {
+      if (error || !authData.user) {
         throw new Response(error?.message ?? "Failed to sign up user", { status: 400 });
       }
-      createdUser = data.user;
+      createdUser = authData.user;
       await context.supabase.from("user_roles").upsert({ user_id: createdUser.id, role: data.role }, { onConflict: "user_id,role" });
       return { id: createdUser.id };
     }
