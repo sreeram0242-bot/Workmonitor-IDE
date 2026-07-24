@@ -3,8 +3,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
 // Setup Pool with explicit SSL for Vercel + CockroachDB
+let connectionString = process.env.DATABASE_URL;
+if (!connectionString || connectionString.includes("@base")) {
+  connectionString = "postgresql://sreeram:WB0vEQzpERLXKgm7HZOCfQ@horned-tamarin-18679.jxf.gcp-asia-south1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full";
+}
+
 const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL || "",
+  connectionString: connectionString,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined
 });
 const adapter = new PrismaPg(pool);
