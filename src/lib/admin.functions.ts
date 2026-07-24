@@ -21,7 +21,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (roleRow?.role !== "admin") {
-      throw new Response("Forbidden", { status: 403 });
+      throw new Error("Forbidden");
     }
 
     let createdUser;
@@ -41,7 +41,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
         },
       });
       if (error || !authData.user) {
-        throw new Response(error?.message ?? "Failed to create user", { status: 400 });
+        throw new Error(error?.message ?? "Failed to create user");
       }
       createdUser = authData.user;
       
@@ -74,7 +74,7 @@ export const createTeamMember = createServerFn({ method: "POST" })
         }
       });
       if (error || !authData.user) {
-        throw new Response(error?.message ?? "Failed to sign up user", { status: 400 });
+        throw new Error(error?.message ?? "Failed to sign up user");
       }
       createdUser = authData.user;
       
@@ -110,17 +110,17 @@ export const deleteTeamMember = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .maybeSingle();
     if (roleRow?.role !== "admin") {
-      throw new Response("Forbidden", { status: 403 });
+      throw new Error("Forbidden");
     }
     if (data.user_id === context.userId) {
-      throw new Response("Cannot delete yourself", { status: 400 });
+      throw new Error("Cannot delete yourself");
     }
     
     let fallbackToAnon = false;
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-      if (error) throw new Response(error.message, { status: 400 });
+      if (error) throw new Error(error.message);
     } catch (e: any) {
       if (e.message?.includes("Missing Supabase environment variable(s)")) {
         console.warn("Service role key missing, using fallback for delete user");

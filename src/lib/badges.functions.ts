@@ -36,7 +36,7 @@ export const setMemberBadge = createServerFn({ method: "POST" })
       const { data: me } = await context.supabase
         .from("profiles").select("badge").eq("id", context.userId).maybeSingle();
       if ((me as any)?.badge !== "Developer") {
-        throw new Response("Only a Developer can change the Developer badge", { status: 403 });
+        throw new Error("Only a Developer can change the Developer badge");
       }
     }
 
@@ -47,7 +47,7 @@ export const setMemberBadge = createServerFn({ method: "POST" })
         .from("profiles")
         .update({ badge } as any)
         .eq("id", data.user_id);
-      if (error) throw new Response(error.message, { status: 400 });
+      if (error) throw new Error(error.message);
     } catch (e: any) {
       if (e.message?.includes("Missing Supabase environment variable(s)")) {
         console.warn("Service role key missing, using fallback for badge update");
@@ -64,8 +64,7 @@ export const setMemberBadge = createServerFn({ method: "POST" })
         .from("profiles")
         .update({ badge } as any)
         .eq("id", data.user_id);
-      if (error) throw new Response(error.message, { status: 400 });
+      if (error) throw new Error(error.message);
     }
     return { ok: true };
   });
-
