@@ -1,7 +1,6 @@
-import { createRequire } from "module";
 import type { PrismaClient } from "@prisma/client";
-const require = createRequire(import.meta.url);
-const { PrismaClient: PrismaClientImpl } = require("@prisma/client");
+import PrismaPkg from "@prisma/client";
+const PrismaClientImpl = PrismaPkg.PrismaClient;
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
