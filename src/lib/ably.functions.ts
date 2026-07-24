@@ -1,22 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
+import * as Ably from "ably";
 
-// Lazy-init the Ably REST client so it only runs on the server
-let _ablyRest: any = null;
-function getAblyRest() {
-  if (_ablyRest) return _ablyRest;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Ably = require("ably");
-  _ablyRest = new Ably.Rest({ key: process.env.ABLY_API_KEY });
-  return _ablyRest;
-}
+// Singleton REST client
+export const ablyRest = new Ably.Rest({
+  key: process.env.ABLY_API_KEY || "",
+});
 
 export const getAblyToken = createServerFn({ method: "POST" }).handler(async () => {
   const authResult = await auth();
   if (!authResult.userId) throw new Error("Unauthorized");
 
   try {
-    const tokenRequestData = await getAblyRest().auth.createTokenRequest({
+    const tokenRequestData = await ablyRest.auth.createTokenRequest({
       clientId: authResult.userId,
     });
     return tokenRequestData;
@@ -33,7 +29,7 @@ export async function broadcast(channelName: string, eventName: string, data: an
     return;
   }
   try {
-    const channel = getAblyRest().channels.get(channelName);
+    const channel = ablyRest.channels.get(channelName);
     await channel.publish(eventName, data);
   } catch (e) {
     console.error("Ably broadcast error:", e);
