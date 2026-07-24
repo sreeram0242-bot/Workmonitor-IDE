@@ -1,6 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
-import PrismaPkg from "@prisma/client";
-const PrismaClientImpl = PrismaPkg.PrismaClient;
+import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
