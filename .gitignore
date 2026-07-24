@@ -32,3 +32,8 @@ dist-ssr
 *.sw?
 
 /src/generated/prisma
+
+# Environment secrets (never commit these!)
+.env
+.env.local
+.env.production
