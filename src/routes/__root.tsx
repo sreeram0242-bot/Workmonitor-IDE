@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster, toast } from "sonner";
 import { ClerkProvider } from "@clerk/tanstack-start";
+import { AuthProvider } from "@/hooks/use-auth";
 
 import appCss from "../styles.css?url";
 
@@ -114,8 +115,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster position="top-right" richColors closeButton />
+      <AuthProvider>
+        <Outlet />
+        <Toaster position="top-right" richColors closeButton />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

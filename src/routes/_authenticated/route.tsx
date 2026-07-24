@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -92,11 +92,6 @@ function AuthenticatedLayout() {
   );
 }
 
-// Wrapping in AuthProvider at the Route component level
 function RouteComponent() {
-  return (
-    <AuthProvider>
-      <AuthenticatedLayout />
-    </AuthProvider>
-  );
+  return <AuthenticatedLayout />;
 }
