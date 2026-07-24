@@ -161,14 +161,9 @@ export const deleteTask = createServerFn({ method: "POST" })
     return true;
   });
 
-import { v2 as cloudinary } from "cloudinary";
 import { broadcast } from "@/lib/ably.functions";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// cloudinary is loaded lazily inside the handler (server-only)
 
 export const submitTaskProof = createServerFn({ method: "POST" })
   .validator(
@@ -177,7 +172,14 @@ export const submitTaskProof = createServerFn({ method: "POST" })
   .handler(async ({ data: { taskId, fileBase64, fileName, note } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
 
-    // Upload to Cloudinary
+    // Upload to Cloudinary (lazy require - server only)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { v2: cloudinary } = require("cloudinary");
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
     const base64Data = `data:image/jpeg;base64,${fileBase64}`;
     const uploadResult = await cloudinary.uploader.upload(base64Data, {
       folder: `workmonitor/${auth.userId}/${taskId}`,

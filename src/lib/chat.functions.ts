@@ -5,11 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { v2 as cloudinary } from "cloudinary";
 import { broadcast } from "@/lib/ably.functions";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// cloudinary config is applied lazily inside handlers (server-only)
+
 const prisma = new PrismaClient();
 
 function getReqOrThrow() {
@@ -168,6 +165,11 @@ export const uploadChatAttachment = createServerFn({ method: "POST" })
   .handler(async ({ data: { conversationId, fileBase64, fileName, mimeType } }) => {
     const auth = await getAuthOrThrow(getReqOrThrow());
 
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
     const base64Data = `data:${mimeType};base64,${fileBase64}`;
     const uploadResult = await cloudinary.uploader.upload(base64Data, {
       folder: `workmonitor/chat/${conversationId}`,
