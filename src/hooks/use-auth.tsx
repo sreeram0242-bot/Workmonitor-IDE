@@ -48,39 +48,41 @@ function useAuthState(initialState?: AuthState): AuthState {
         return;
       }
 
-      // We have a Clerk user, fetch role/profile from our DB via server function
+      // Immediately set user state from Clerk so UI doesn't wait 2 seconds or freeze
+      const immediateProfile = cachedAuthState.profile || {
+        full_name: user.fullName || user.primaryEmailAddress?.emailAddress || "User",
+        position: "",
+        avatar_url: user.imageUrl,
+      };
+
+      const immediateState: AuthState = {
+        loading: false,
+        session: { user: { id: user.id } },
+        user: { id: user.id, email: user.primaryEmailAddress?.emailAddress },
+        role: cachedAuthState.role || "user",
+        profile: immediateProfile,
+      };
+
+      cachedAuthState = immediateState;
+      if (mounted) setState(immediateState);
+
+      // Fetch role/profile from our DB via server function in background
       try {
         const dbData = await getMyProfile();
+        if (!mounted) return;
 
         const nextState: AuthState = {
           loading: false,
-          session: { user: { id: user.id } }, // Dummy session object for compatibility
+          session: { user: { id: user.id } },
           user: { id: user.id, email: user.primaryEmailAddress?.emailAddress },
           role: (dbData?.role as AppRole) || "user",
-          profile: dbData?.profile || {
-            full_name: user.fullName || "New User",
-            position: "",
-            avatar_url: user.imageUrl,
-          },
+          profile: dbData?.profile || immediateProfile,
         };
 
         cachedAuthState = nextState;
-        if (mounted) setState(nextState);
+        setState(nextState);
       } catch (e) {
         console.error("Failed to fetch profile", e);
-        const fallbackState: AuthState = {
-          loading: false,
-          session: { user: { id: user.id } },
-          user: { id: user.id, email: user.primaryEmailAddress?.emailAddress },
-          role: "user",
-          profile: {
-            full_name: user.fullName || "New User",
-            position: "",
-            avatar_url: user.imageUrl,
-          },
-        };
-        cachedAuthState = fallbackState;
-        if (mounted) setState(fallbackState);
       }
     }
 

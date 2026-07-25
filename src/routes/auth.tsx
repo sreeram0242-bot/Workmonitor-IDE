@@ -422,15 +422,15 @@ function BlobScene({ passwordFocused }: { passwordFocused: boolean }) {
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { isLoaded, userId } = useAuth();
+  const { loading, user } = useAuth();
 
   useEffect(() => {
-    if (isLoaded && userId) {
+    if (!loading && user) {
       navigate({ to: "/app", replace: true });
     }
-  }, [isLoaded, userId, navigate]);
+  }, [loading, user, navigate]);
 
-  if (!isLoaded || userId) {
+  if (loading || user) {
     return null;
   }
 
