@@ -267,25 +267,29 @@ function ChatPage() {
 
   async function reloadConversations() {
     if (!user) return;
-    const [convs, t] = await Promise.all([fetchMyConversations(user.id), fetchTeam()]);
+    const [convs, t, lr, mutesMap] = await Promise.all([
+      fetchMyConversations(user.id),
+      fetchTeam(),
+      fetchLastReadMap(user.id),
+      fetchMuteMap(user.id),
+    ]);
     setConversations(convs);
     setTeam(t);
-    const memberMap: Record<string, string[]> = {};
-    await Promise.all(
-      convs.map(async (c) => {
-        memberMap[c.id] = await fetchConversationMembers(c.id);
-      }),
-    );
-    setConvMembers(memberMap);
-    const lr = await fetchLastReadMap(user.id);
     setLastRead(lr);
-    const uc = await fetchUnreadCounts(
-      user.id,
-      convs.map((c) => c.id),
-      lr,
-    );
+    setMutes(mutesMap);
+
+    const convIds = convs.map((c) => c.id);
+    const [memberResults, uc] = await Promise.all([
+      Promise.all(convs.map((c) => fetchConversationMembers(c.id))),
+      fetchUnreadCounts(user.id, convIds, lr),
+    ]);
+
+    const memberMap: Record<string, string[]> = {};
+    convs.forEach((c, idx) => {
+      memberMap[c.id] = memberResults[idx];
+    });
+    setConvMembers(memberMap);
     setUnread(uc);
-    setMutes(await fetchMuteMap(user.id));
   }
 
   useEffect(() => {
@@ -1054,7 +1058,7 @@ function ChatPage() {
                       onSwipeLeft={() => setReplyTo(m)}
                       onLongPress={() => {
                         const btn = document.querySelector(
-                          `#msg-${m.id} .msg-react-btn`,
+                          `#msg-${m.id} .msg-options-btn`,
                         ) as HTMLButtonElement;
                         btn?.click();
                       }}
@@ -1074,6 +1078,13 @@ function ChatPage() {
                     >
                       <div
                         id={`msg-${m.id}`}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          const btn = document.querySelector(
+                            `#msg-${m.id} .msg-options-btn`,
+                          ) as HTMLButtonElement;
+                          btn?.click();
+                        }}
                         className={`group/msg flex items-end gap-2 ${mine ? "justify-end" : "justify-start"} rounded-lg transition-shadow`}
                       >
                         {!mine && (
@@ -1269,7 +1280,7 @@ function ChatPage() {
 
                           {!isDeleted && !isEditing && (
                             <div
-                              className={`absolute -top-3 ${mine ? "right-1" : "left-1"} flex items-center gap-0.5 rounded-full bg-white/95 px-0.5 shadow ring-1 ring-black/5 opacity-0 transition-opacity group-hover/msg:opacity-100`}
+                              className={`absolute -top-3 ${mine ? "right-1" : "left-1"} flex items-center gap-0.5 rounded-full bg-white/95 px-0.5 shadow ring-1 ring-black/5 opacity-100 sm:opacity-0 transition-opacity group-hover/msg:opacity-100`}
                             >
                               <Popover>
                                 <PopoverTrigger asChild>
