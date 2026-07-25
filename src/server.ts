@@ -27,13 +27,6 @@ async function normalizeCatastrophicSsrResponse(response: Response, request: Req
 
   const isApi = request.url.includes("_serverFn") || request.url.includes("api") || request.headers.get("accept")?.includes("json");
   if (isApi) {
-    const errorObj = consumeLastCapturedError();
-    if (errorObj) {
-      return new Response(JSON.stringify({ error: errorObj.message || String(errorObj) }), {
-        status: 500,
-        headers: { "content-type": "application/json" }
-      });
-    }
     return response;
   }
 

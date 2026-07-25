@@ -63,12 +63,9 @@ function LockPage() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key >= "0" && e.key <= "9") {
         e.preventDefault();
-        setPin((p) => {
-          if (p.length >= 4) return p;
-          const next = (p + e.key).slice(0, 4);
-          if (next.length === 4) setTimeout(() => submit(next), 0);
-          return next;
-        });
+        const next = (pin + e.key).slice(0, 4);
+        setPin(next);
+        if (next.length === 4) submit(next);
       } else if (e.key === "Backspace") {
         e.preventDefault();
         setPin((p) => p.slice(0, -1));
@@ -79,7 +76,7 @@ function LockPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, success, mode, firstPin]);
+  }, [busy, success, mode, firstPin, pin]);
 
   function finish() {
     if (user) {
@@ -287,12 +284,9 @@ function LockPage() {
                     setPin((p) => p.slice(0, -1));
                     return;
                   }
-                  setPin((p) => {
-                    if (p.length >= 4) return p;
-                    const next = (p + k).slice(0, 4);
-                    if (next.length === 4) setTimeout(() => submit(next), 0);
-                    return next;
-                  });
+                  const next = (pin + k).slice(0, 4);
+                  setPin(next);
+                  if (next.length === 4) submit(next);
                 }}
                 className={`h-14 rounded-2xl font-medium transition-all duration-150 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 ${
                   k === "reset"
