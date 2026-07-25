@@ -14,6 +14,12 @@ import { AuthProvider } from "@/hooks/use-auth";
 
 import appCss from "../styles.css?url";
 
+declare global {
+  interface Window {
+    median?: any;
+  }
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -112,6 +118,19 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    // If Median incorrectly traps the app in its In-App Browser modal, force close it.
+    if (typeof window !== "undefined") {
+      const checkMedian = setInterval(() => {
+        if (window.median && window.median.webview && window.median.webview.modal) {
+          window.median.webview.modal.close();
+          clearInterval(checkMedian);
+        }
+      }, 500);
+      setTimeout(() => clearInterval(checkMedian), 5000);
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
