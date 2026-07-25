@@ -31,6 +31,7 @@ function AuthenticatedLayout() {
     return <Navigate to="/auth" replace />;
   }
 
+  const router = useRouter();
   const userId = user?.id;
 
   // Mobile: re-lock whenever the app is backgrounded
@@ -53,7 +54,7 @@ function AuthenticatedLayout() {
             sessionStorage.setItem("wm_unlocked", "1");
             localStorage.removeItem("wm_bg_at");
           } else if (bgAt > 0) {
-            window.location.reload();
+            router.navigate({ to: "/lock", search: { redirect: window.location.pathname }, replace: true });
           }
         }
       };
@@ -71,7 +72,7 @@ function AuthenticatedLayout() {
       clearTimeout(timer);
       timer = setTimeout(() => {
         relockNow();
-        window.location.reload();
+        router.navigate({ to: "/lock", search: { redirect: window.location.pathname }, replace: true });
       }, IDLE_MS);
     };
     const events = ["mousemove", "keydown", "mousedown", "touchstart", "scroll"];
