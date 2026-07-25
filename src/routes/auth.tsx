@@ -490,8 +490,7 @@ function AuthPage() {
             </div>
 
             <SignIn
-              routing="path"
-              path="/auth"
+              routing="hash"
               appearance={{
                 elements: {
                   // Hide the "Don't have an account? Sign up" footer link
