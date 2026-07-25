@@ -97,7 +97,7 @@ export function NotificationsBell() {
     if (!user || unread === 0) return;
     setItems((prev) => prev.map((i) => ({ ...i, read: true })));
     try {
-      await markNotificationsRead({});
+      await markNotificationsRead({ data: {} });
     } catch (e) {
       console.error(e);
     }

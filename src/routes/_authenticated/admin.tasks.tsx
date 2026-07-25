@@ -672,7 +672,7 @@ function EditTaskDialog({
   const [deadline, setDeadline] = useState(
     task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : "",
   );
-  const [recurrence, setRecurrence] = useState<TaskRecurrence>(task.recurrence ?? "none");
+  const [recurrence, setRecurrence] = useState<TaskRecurrence>((task.recurrence as TaskRecurrence) ?? "none");
   const [tags, setTags] = useState<string[]>(task.tags ?? []);
   const [busy, setBusy] = useState(false);
 
@@ -683,7 +683,7 @@ function EditTaskDialog({
     setAssignedTo(task.assigned_to);
     setPriority(task.priority);
     setDeadline(task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : "");
-    setRecurrence(task.recurrence ?? "none");
+    setRecurrence((task.recurrence as TaskRecurrence) ?? "none");
     setTags(task.tags ?? []);
   }, [open, task]);
 

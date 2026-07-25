@@ -51,7 +51,7 @@ export const Route = createFileRoute("/_authenticated/app")({
 });
 
 function EmployeeHome() {
-  const { loading, role, user } = useAuth();
+  const { loading, role, user, profile } = useAuth();
   const cached = user ? getCachedUserTasks(user.id) : null;
   const [tasks, setTasks] = useState<TaskRow[]>(cached ?? []);
   const [initial, setInitial] = useState(!cached);
@@ -122,7 +122,7 @@ function EmployeeHome() {
   ).length;
 
   const firstName =
-    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ?? "there";
+    (profile?.full_name as string | undefined)?.split(" ")[0] ?? "there";
   const hour = now.getHours();
   const greet = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 

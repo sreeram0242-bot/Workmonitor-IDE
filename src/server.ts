@@ -34,7 +34,7 @@ async function normalizeCatastrophicSsrResponse(response: Response, request: Req
   if (!isH3SwallowedErrorBody(body)) return response;
 
   const errorObj = consumeLastCapturedError();
-  const errorMsg = errorObj ? (errorObj.message || String(errorObj)) : `h3 swallowed SSR error: ${body}`;
+  const errorMsg = errorObj ? ((errorObj as any).message || String(errorObj)) : `h3 swallowed SSR error: ${body}`;
   console.error(errorObj ?? new Error(errorMsg));
   
   return new Response(renderErrorPage(errorMsg), {

@@ -10,7 +10,8 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
-    const errString = error?.stack || error?.message || String(error) || "Internal Server Error";
+    const err = error as any;
+    const errString = err?.stack || err?.message || String(error) || "Internal Server Error";
     console.error("Server function error:", errString);
     
     throw error;

@@ -47,7 +47,7 @@ import { chromium } from 'playwright';
   console.log('Waiting for response...');
   await page.waitForTimeout(5000);
   
-  await page.screenshot({ path: 'C:\\Users\\acer\\.gemini\\antigravity-ide\\brain\\d825f60d-849d-4429-9fe9-538d8e3ab700\\overview.png', fullPage: true });
+  await page.screenshot({ path: 'C:\\Users\\acer\\.gemini\\antigravity-ide\\brain\\10f54b09-890d-49fb-9386-495a46efa193\\overview.png', fullPage: true });
   console.log('Screenshot saved to overview.png');
   
   await browser.close();

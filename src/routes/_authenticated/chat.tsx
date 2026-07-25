@@ -319,16 +319,17 @@ function ChatPage() {
     }
 
     function loadChat() {
-      fetchMessages(activeId).then((msgs) => {
+      const id = activeId as string;
+      fetchMessages(id).then((msgs) => {
         setMessages(msgs);
         setHasMoreOlder(msgs.length >= MESSAGES_PAGE_SIZE);
       });
-      fetchPinnedMessages(activeId).then(setPinned);
-      fetchReactions(activeId).then(setReactions);
-      fetchLastReadByMembers(activeId).then(setReadByMap);
-      markConversationRead(activeId, user!.id).then(() => {
-        setLastRead((prev) => ({ ...prev, [activeId]: new Date().toISOString() }));
-        setUnread((prev) => ({ ...prev, [activeId]: 0 }));
+      fetchPinnedMessages(id).then(setPinned);
+      fetchReactions(id).then(setReactions);
+      fetchLastReadByMembers(id).then(setReadByMap);
+      markConversationRead(id, user!.id).then(() => {
+        setLastRead((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+        setUnread((prev) => ({ ...prev, [id]: 0 }));
       });
     }
 

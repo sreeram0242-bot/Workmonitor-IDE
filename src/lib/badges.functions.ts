@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { auth } from "@clerk/tanstack-react-start/server";
 import { prisma } from "@/lib/prisma";
 import { broadcast } from "@/lib/ably.functions";
-import { triggerNotification } from "@/lib/notify.functions";
 import { z } from "zod";
 
 
