@@ -491,7 +491,7 @@ function AuthPage() {
 
             <SignIn
               routing="hash"
-              forceRedirectUrl="/lock"
+              fallbackRedirectUrl="/app"
               appearance={{
                 elements: {
                   // Hide the "Don't have an account? Sign up" footer link

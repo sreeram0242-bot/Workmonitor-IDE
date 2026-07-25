@@ -27,9 +27,16 @@ import { chromium } from 'playwright';
   await page.waitForTimeout(5000);
   
   console.log('Entering passcode...');
-  for (const num of ['1', '2', '3', '4']) {
-    await page.click(`button:has-text("${num}")`);
-    await page.waitForTimeout(500);
+  try {
+    for (const num of ['1', '2', '3', '4']) {
+      await page.click(`button:has-text("${num}")`);
+      await page.waitForTimeout(500);
+    }
+  } catch (e) {
+    console.log('Timeout clicking buttons. Taking screenshot...');
+    await page.screenshot({ path: 'C:\\Users\\acer\\.gemini\\antigravity-ide\\brain\\10f54b09-890d-49fb-9386-495a46efa193\\error_state.png', fullPage: true });
+    await browser.close();
+    process.exit(1);
   }
   
   await page.waitForTimeout(2000);

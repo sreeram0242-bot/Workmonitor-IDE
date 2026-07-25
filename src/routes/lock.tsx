@@ -106,12 +106,26 @@ function LockPage() {
     setBusy(true);
     try {
       if (mode === "unlock") {
-        const ok = await verifyPasscode({ data: value });
+        let ok = false;
+        try {
+          ok = await verifyPasscode({ data: value });
+        } catch (err: any) {
+          if (err.name === "AbortError" || err.message.includes("aborted")) {
+            console.error("verifyPasscode aborted, retrying or ignoring...", err);
+            toast.error("Network request interrupted. Please try again.");
+            setPin("");
+            setBusy(false);
+            return;
+          }
+          throw err;
+        }
+
         if (!ok) {
           setShake(true);
           setTimeout(() => setShake(false), 500);
           toast.error(`Incorrect passcode`);
           setTimeout(() => setPin(""), 260);
+          setBusy(false);
           return;
         }
         setSuccess(true);
@@ -121,6 +135,7 @@ function LockPage() {
         setTimeout(() => {
           setPin("");
           setMode("confirm");
+          setBusy(false);
         }, 220);
       } else if (mode === "confirm") {
         if (value !== firstPin) {
@@ -131,6 +146,7 @@ function LockPage() {
             setPin("");
             setFirstPin("");
             setMode("setup");
+            setBusy(false);
           }, 400);
           return;
         }
@@ -142,7 +158,6 @@ function LockPage() {
     } catch (err: any) {
       toast.error(err.message ?? "Something went wrong");
       setPin("");
-    } finally {
       setBusy(false);
     }
   }
