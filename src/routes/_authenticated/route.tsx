@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Navigate, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,8 +15,7 @@ function AuthenticatedLayout() {
   const withinGrace = backgroundedAt > 0 && Date.now() - backgroundedAt < 60_000;
 
   if (typeof window !== "undefined" && !unlocked && !withinGrace) {
-    window.location.href = `/lock?redirect=${encodeURIComponent(window.location.pathname)}`;
-    return null;
+    return <Navigate to="/lock" search={{ redirect: window.location.pathname }} replace />;
   }
 
   if (typeof window !== "undefined" && !unlocked && withinGrace) {
@@ -28,12 +27,9 @@ function AuthenticatedLayout() {
   // useAuth depends on Clerk's useUser which is inside the ClerkProvider.
   const { loading, user } = useAuth();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      // Not logged in -> redirect to /auth
-      window.location.href = "/auth";
-    }
-  }, [loading, user]);
+  if (!loading && !user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   const userId = user?.id;
 
