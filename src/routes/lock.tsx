@@ -123,7 +123,7 @@ function LockPage() {
         if (!ok) {
           setShake(true);
           setTimeout(() => setShake(false), 500);
-          toast.error(`Incorrect passcode`);
+          toast.error("Incorrect passcode");
           setTimeout(() => setPin(""), 260);
           setBusy(false);
           return;
@@ -131,17 +131,19 @@ function LockPage() {
         setSuccess(true);
         setTimeout(finish, 480);
       } else if (mode === "setup") {
-        setFirstPin(value);
-        setTimeout(() => {
-          setPin("");
-          setMode("confirm");
-          setBusy(false);
-        }, 220);
+        if (!firstPin) {
+          setFirstPin(value);
+          setTimeout(() => {
+            setPin("");
+            setMode("confirm");
+            setBusy(false);
+          }, 220);
+        }
       } else if (mode === "confirm") {
         if (value !== firstPin) {
           setShake(true);
           setTimeout(() => setShake(false), 500);
-          toast.error("Passcodes don't match");
+          toast.error("Passcodes do not match");
           setTimeout(() => {
             setPin("");
             setFirstPin("");
@@ -150,7 +152,19 @@ function LockPage() {
           }, 400);
           return;
         }
-        await updatePasscode({ data: value });
+        let ok = false;
+        try {
+          ok = await updatePasscode({ data: value });
+        } catch (err: any) {
+          if (err.name === "AbortError" || err.message.includes("aborted")) {
+            toast.error("Network request interrupted. Please try again.");
+            setPin("");
+            setFirstPin("");
+            setBusy(false);
+            return;
+          }
+          throw err;
+        }
         setSuccess(true);
         toast.success("Passcode set");
         setTimeout(finish, 480);
