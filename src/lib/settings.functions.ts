@@ -56,18 +56,27 @@ export const checkPasscode = createServerFn({ method: "POST" }).handler(async ()
 });
 
 export const verifyPasscode = createServerFn({ method: "POST" })
-  .validator((pin: string) => pin)
+  .validator((d: any) => {
+    if (typeof d === "string") return d;
+    if (d && typeof d === "object" && typeof d.data === "string") return d.data;
+    return String(d ?? "");
+  })
   .handler(async ({ data: pin }) => {
     const authResult = await getAuthOrThrow();
     const profile = await prisma.profile.findUnique({
       where: { id: authResult.userId },
       select: { passcode_hash: true },
     });
-    return profile?.passcode_hash === pin;
+    if (!profile?.passcode_hash) return true;
+    return profile.passcode_hash === String(pin);
   });
 
 export const updatePasscode = createServerFn({ method: "POST" })
-  .validator((pin: string) => pin)
+  .validator((d: any) => {
+    if (typeof d === "string") return d;
+    if (d && typeof d === "object" && typeof d.data === "string") return d.data;
+    return String(d ?? "");
+  })
   .handler(async ({ data: pin }) => {
     const authResult = await getAuthOrThrow();
     const client = await clerkClient();

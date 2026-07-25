@@ -22,7 +22,7 @@ function LockPage() {
   const { user, profile, loading } = useAuth();
   const clerk = useClerk();
 
-  const [mode, setMode] = useState<"loading" | "unlock" | "setup" | "confirm">("loading");
+  const [mode, setMode] = useState<"loading" | "unlock" | "setup" | "confirm">("unlock");
   const [pin, setPin] = useState("");
   const [firstPin, setFirstPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,22 +103,27 @@ function LockPage() {
   }
 
   async function submit(value: string) {
-    if (busy) return;
+    if (busy || mode === "loading") return;
     setBusy(true);
     try {
       if (mode === "unlock") {
         let ok = false;
         try {
-          ok = await verifyPasscode({ data: value });
+          const req = verifyPasscode({ data: value });
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Request timed out. Please try again.")), 6000),
+          );
+          ok = (await Promise.race([req, timeout])) as boolean;
         } catch (err: any) {
-          if (err.name === "AbortError" || err.message.includes("aborted")) {
-            console.error("verifyPasscode aborted, retrying or ignoring...", err);
+          if (err.name === "AbortError" || err.message?.includes("aborted")) {
+            console.error("verifyPasscode aborted, retrying...", err);
             toast.error("Network request interrupted. Please try again.");
-            setPin("");
-            setBusy(false);
-            return;
+          } else {
+            toast.error(err.message || "Failed to verify passcode. Please try again.");
           }
-          throw err;
+          setPin("");
+          setBusy(false);
+          return;
         }
 
         if (!ok) {
@@ -178,6 +183,7 @@ function LockPage() {
   }
 
   function onChange(v: string) {
+    if (busy || mode === "loading") return;
     const clean = v.replace(/\D/g, "").slice(0, 4);
     setPin(clean);
     if (clean.length === 4) submit(clean);
@@ -296,10 +302,10 @@ function LockPage() {
               <button
                 key={idx}
                 type="button"
-                disabled={!k || busy}
+                disabled={!k || busy || mode === "loading"}
                 onPointerDown={(e) => {
                   e.preventDefault();
-                  if (!k || busy) return;
+                  if (!k || busy || mode === "loading") return;
                   setPressedKey(idx);
                   setTimeout(() => setPressedKey((p) => (p === idx ? null : p)), 220);
                   if (k === "reset") {
