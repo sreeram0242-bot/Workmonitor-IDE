@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
-import { fetchNotifications, markNotificationsRead, clearNotifications } from "@/lib/notify";
+import { fetchNotifications, markNotificationsRead, clearNotifications } from "@/lib/notify.functions";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
 interface NotificationRow {
