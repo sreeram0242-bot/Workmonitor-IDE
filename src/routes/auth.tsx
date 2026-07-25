@@ -426,9 +426,13 @@ function AuthPage() {
 
   useEffect(() => {
     if (isLoaded && userId) {
-      navigate({ to: "/app" });
+      navigate({ to: "/app", replace: true });
     }
   }, [isLoaded, userId, navigate]);
+
+  if (!isLoaded || userId) {
+    return null;
+  }
 
   // Fix Clerk's submit button accessibility during loading state
   useEffect(() => {
@@ -491,7 +495,6 @@ function AuthPage() {
 
             <SignIn
               routing="hash"
-              fallbackRedirectUrl="/app"
               appearance={{
                 elements: {
                   // Hide the "Don't have an account? Sign up" footer link
