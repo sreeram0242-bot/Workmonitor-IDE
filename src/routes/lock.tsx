@@ -79,11 +79,12 @@ function LockPage() {
   }, [busy, success, mode, firstPin, pin]);
 
   function finish() {
-    if (user) {
-      sessionStorage.setItem("wm_unlocked", "1");
-      localStorage.setItem(`wm_last_active:${user.id}`, String(Date.now()));
+    sessionStorage.setItem("wm_unlocked", "1");
+    const id = user?.id || clerk.user?.id;
+    if (id) {
+      localStorage.setItem(`wm_last_active:${id}`, String(Date.now()));
     }
-    navigate({ to: redirect || "/", replace: true });
+    navigate({ to: redirect || "/app", replace: true });
   }
 
   async function handleForgot() {
