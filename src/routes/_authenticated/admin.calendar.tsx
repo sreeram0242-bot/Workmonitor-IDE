@@ -19,6 +19,7 @@ import {
   getCachedTeam,
   fetchReminders,
   addReminder,
+  sortByPriority,
   type TaskRow,
   type TeamMember,
   type ReminderRow,
@@ -134,7 +135,7 @@ function CalendarPage() {
 
   const tasksByDay = useMemo(() => {
     const map = new Map<string, TaskRow[]>();
-    for (const t of tasks) {
+    for (const t of sortByPriority(tasks)) {
       if (!t.deadline || (Array.isArray(t.tags) && t.tags.includes("reminder"))) continue;
       const d = new Date(t.deadline);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;

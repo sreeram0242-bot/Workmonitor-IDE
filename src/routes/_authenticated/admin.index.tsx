@@ -9,6 +9,7 @@ import {
   getCachedTeam,
   priorityColor,
   statusColor,
+  sortByPriority,
   type TaskRow,
   type TeamMember,
 } from "@/lib/tasks";
@@ -125,12 +126,14 @@ function AdminOverview() {
 
   const filtered = useMemo(
     () =>
-      tasks.filter((t) => {
-        const created = new Date(t.created_at);
-        if (from && created < from) return false;
-        if (to && created > to) return false;
-        return true;
-      }),
+      sortByPriority(
+        tasks.filter((t) => {
+          const created = new Date(t.created_at);
+          if (from && created < from) return false;
+          if (to && created > to) return false;
+          return true;
+        }),
+      ),
     [tasks, from, to],
   );
 
@@ -443,6 +446,7 @@ function MemberDrill({ tasks }: { tasks: TaskRow[] }) {
     return (
       <div className="py-6 text-center text-sm text-muted-foreground">No tasks in this range.</div>
     );
+  const sortedTasks = sortByPriority(tasks);
   const counts = {
     pending: tasks.filter((t) => t.status === "pending").length,
     completed: tasks.filter((t) => t.status === "completed").length,
@@ -464,7 +468,7 @@ function MemberDrill({ tasks }: { tasks: TaskRow[] }) {
         Approval rate: <span className="font-semibold text-foreground">{completion}%</span>
       </div>
       <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
-        {tasks.map((t) => (
+        {sortedTasks.map((t) => (
           <div
             key={t.id}
             className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"

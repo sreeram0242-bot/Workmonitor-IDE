@@ -67,6 +67,27 @@ export async function fetchTeam(force = false): Promise<TeamMember[]> {
 let _adminTasksCache: TaskRow[] | null = null;
 const _userTasksCache = new Map<string, TaskRow[]>();
 
+export const PRIORITY_ORDER: Record<string, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+export function compareTaskPriority(a: TaskRow, b: TaskRow): number {
+  const pA = PRIORITY_ORDER[a.priority] ?? 0;
+  const pB = PRIORITY_ORDER[b.priority] ?? 0;
+  if (pB !== pA) {
+    return pB - pA;
+  }
+  const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+  const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+  return timeB - timeA;
+}
+
+export function sortByPriority(tasks: TaskRow[]): TaskRow[] {
+  return [...tasks].sort(compareTaskPriority);
+}
+
 export function getCachedAdminTasks(): TaskRow[] | null {
   return _adminTasksCache;
 }
@@ -76,14 +97,15 @@ export function getCachedUserTasks(userId: string): TaskRow[] | null {
 
 export async function fetchTasksForAdmin(): Promise<TaskRow[]> {
   const rows = await serverFetchTasksForAdmin();
-  _adminTasksCache = rows as any[];
+  _adminTasksCache = sortByPriority(rows as any[]);
   return _adminTasksCache!;
 }
 
 export async function fetchTasksForUser(userId: string): Promise<TaskRow[]> {
   const rows = await serverFetchTasksForUser({ data: userId });
-  _userTasksCache.set(userId, rows as any[]);
-  return rows as any[];
+  const sorted = sortByPriority(rows as any[]);
+  _userTasksCache.set(userId, sorted);
+  return sorted;
 }
 
 export function getCachedTeam(): TeamMember[] | null {

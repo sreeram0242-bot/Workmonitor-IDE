@@ -23,6 +23,7 @@ import {
   fetchTeam,
   getCachedAdminTasks,
   getCachedTeam,
+  sortByPriority,
   type TaskRow,
   type TeamMember,
 } from "@/lib/tasks";
@@ -73,14 +74,14 @@ export function GlobalSearch() {
   const results = useMemo(() => {
     if (!query) return { tasks: [] as TaskRow[], people: [] as TeamMember[] };
     return {
-      tasks: tasks
-        .filter(
+      tasks: sortByPriority(
+        tasks.filter(
           (t) =>
             t.title.toLowerCase().includes(query) ||
             (t.description ?? "").toLowerCase().includes(query) ||
             (t.tags ?? []).some((tag) => tag.toLowerCase().includes(query)),
-        )
-        .slice(0, 8),
+        ),
+      ).slice(0, 8),
       people: team
         .filter(
           (p) =>

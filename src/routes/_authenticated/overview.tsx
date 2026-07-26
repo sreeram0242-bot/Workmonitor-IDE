@@ -9,6 +9,7 @@ import {
   getCachedUserTasks,
   priorityColor,
   statusColor,
+  compareTaskPriority,
   type TaskRow,
 } from "@/lib/tasks";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
@@ -96,7 +97,11 @@ function UserOverview() {
 
   const upcoming = [...open]
     .filter((t) => t.deadline)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+    .sort((a, b) => {
+      const pDiff = compareTaskPriority(a, b);
+      if (pDiff !== 0) return pDiff;
+      return new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime();
+    })
     .slice(0, 5);
 
   if (loading)

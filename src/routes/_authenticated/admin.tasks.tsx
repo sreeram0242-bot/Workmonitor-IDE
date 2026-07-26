@@ -47,6 +47,7 @@ import {
   signedProofUrl,
   priorityColor,
   statusColor,
+  sortByPriority,
   getCachedAdminTasks,
   getCachedTeam,
   bulkApproveTasks,
@@ -154,7 +155,7 @@ function AdminTasks() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return tasks.filter((t) => {
+    const list = tasks.filter((t) => {
       if (Array.isArray(t.tags) && t.tags.includes("reminder")) return false;
       if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
@@ -168,6 +169,7 @@ function AdminTasks() {
         return false;
       return true;
     });
+    return sortByPriority(list);
   }, [tasks, search, assigneeFilter, priorityFilter, tagFilter]);
 
   const allTags = useMemo(() => {

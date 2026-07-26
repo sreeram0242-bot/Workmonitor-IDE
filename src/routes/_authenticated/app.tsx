@@ -21,6 +21,7 @@ import {
   fetchTasksForUser,
   getCachedUserTasks,
   priorityColor,
+  sortByPriority,
   statusColor,
   submitTaskProof,
   type TaskRow,
@@ -83,12 +84,14 @@ function EmployeeHome() {
   if (role === "admin") return <Navigate to="/admin" />;
 
   const q = search.trim().toLowerCase();
-  const visible = tasks.filter((t) => {
-    if (Array.isArray(t.tags) && t.tags.includes("reminder")) return false;
-    if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
-    if (q && !`${t.title} ${t.description ?? ""}`.toLowerCase().includes(q)) return false;
-    return true;
-  });
+  const visible = sortByPriority(
+    tasks.filter((t) => {
+      if (Array.isArray(t.tags) && t.tags.includes("reminder")) return false;
+      if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+      if (q && !`${t.title} ${t.description ?? ""}`.toLowerCase().includes(q)) return false;
+      return true;
+    }),
+  );
   const active = visible.filter((t) => t.status === "pending" || t.status === "revision");
   const submitted = visible.filter((t) => t.status === "completed");
   const done = visible.filter((t) => t.status === "approved");
