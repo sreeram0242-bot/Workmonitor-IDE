@@ -60,17 +60,23 @@ export const createProject = createServerFn({ method: "POST" })
         client_name: client_name ?? null,
         created_by: authResult.userId,
         current_stage_index: 0,
-        stages: {
-          create: defaultStages.map((s, idx) => ({
-            title: s.title,
-            subtitle: s.subtitle ?? null,
-            description: s.description ?? null,
-            position: idx,
-            is_completed: idx === 0,
-            completed_at: idx === 0 ? new Date() : null,
-          })),
-        },
       },
+    });
+
+    await prisma.projectStage.createMany({
+      data: defaultStages.map((s, idx) => ({
+        project_id: project.id,
+        title: s.title,
+        subtitle: s.subtitle ?? null,
+        description: s.description ?? null,
+        position: idx,
+        is_completed: idx === 0,
+        completed_at: idx === 0 ? new Date() : null,
+      })),
+    });
+
+    const fullProject = await prisma.project.findUnique({
+      where: { id: project.id },
       include: {
         stages: {
           orderBy: { position: "asc" },
@@ -79,7 +85,7 @@ export const createProject = createServerFn({ method: "POST" })
     });
 
     await broadcast("projects", "project-updates", { type: "project_created", projectId: project.id });
-    return project;
+    return fullProject;
   });
 
 export const updateProject = createServerFn({ method: "POST" })
