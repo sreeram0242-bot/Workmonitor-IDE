@@ -14,6 +14,7 @@ import {
   Calendar,
   Kanban,
   Terminal,
+  Workflow,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const baseNav = isAdmin
     ? [
         { to: "/admin", label: "Overview", icon: LayoutDashboard, desc: "Dashboard & analytics" },
+        { to: "/projects", label: "Projects", icon: Workflow, desc: "Flow & stage tracker" },
         { to: "/admin/tasks", label: "All Tasks", icon: ListChecks, desc: "Assign & review" },
         { to: "/app", label: "My Tasks", icon: Kanban, desc: "Assigned to me" },
         { to: "/admin/calendar", label: "Calendar", icon: Calendar, desc: "Deadline view" },
@@ -59,6 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ]
     : [
         { to: "/overview", label: "Overview", icon: LayoutDashboard, desc: "Your snapshot" },
+        { to: "/projects", label: "Projects", icon: Workflow, desc: "Flow & stage tracker" },
         { to: "/app", label: "My Tasks", icon: ListChecks, desc: "Today's checklist" },
         { to: "/chat", label: "Chat", icon: MessageSquare, desc: "Messages & groups" },
         { to: "/settings", label: "Settings", icon: Settings, desc: "Profile photo" },

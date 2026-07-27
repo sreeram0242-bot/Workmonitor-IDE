@@ -18,6 +18,7 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/ap
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedDevRouteImport } from './routes/_authenticated/dev'
 import { Route as AuthenticatedOverviewRouteImport } from './routes/_authenticated/overview'
+import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminCalendarRouteImport } from './routes/_authenticated/admin.calendar'
@@ -68,6 +69,11 @@ const AuthenticatedOverviewRoute = AuthenticatedOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof AuthenticatedChatRoute
   '/dev': typeof AuthenticatedDevRoute
   '/overview': typeof AuthenticatedOverviewRoute
+  '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/admin/tasks': typeof AuthenticatedAdminTasksRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/chat': typeof AuthenticatedChatRoute
   '/dev': typeof AuthenticatedDevRoute
   '/overview': typeof AuthenticatedOverviewRoute
+  '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/admin/tasks': typeof AuthenticatedAdminTasksRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dev': typeof AuthenticatedDevRoute
   '/_authenticated/overview': typeof AuthenticatedOverviewRoute
+  '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/admin/calendar': typeof AuthenticatedAdminCalendarRoute
   '/_authenticated/admin/tasks': typeof AuthenticatedAdminTasksRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dev'
     | '/overview'
+    | '/projects'
     | '/settings'
     | '/admin/calendar'
     | '/admin/tasks'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dev'
     | '/overview'
+    | '/projects'
     | '/settings'
     | '/admin/calendar'
     | '/admin/tasks'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chat'
     | '/_authenticated/dev'
     | '/_authenticated/overview'
+    | '/_authenticated/projects'
     | '/_authenticated/settings'
     | '/_authenticated/admin/calendar'
     | '/_authenticated/admin/tasks'
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOverviewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/projects': {
+      id: '/_authenticated/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthenticatedProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -322,6 +341,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDevRoute: typeof AuthenticatedDevRoute
   AuthenticatedOverviewRoute: typeof AuthenticatedOverviewRoute
+  AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
@@ -331,6 +351,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDevRoute: AuthenticatedDevRoute,
   AuthenticatedOverviewRoute: AuthenticatedOverviewRoute,
+  AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 

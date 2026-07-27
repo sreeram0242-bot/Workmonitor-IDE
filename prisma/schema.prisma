@@ -4,7 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "cockroachdb"
+  provider     = "cockroachdb"
+  relationMode = "prisma"
 }
 
 enum AppRole {
@@ -184,4 +185,34 @@ model Reminder {
   notified   Boolean  @default(false)
   created_at DateTime @default(now())
 }
+
+model Project {
+  id                  String         @id @default(uuid())
+  name                String
+  description         String?
+  client_name         String?
+  status              String         @default("in_progress")
+  created_by          String
+  current_stage_index Int            @default(0)
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  stages ProjectStage[]
+}
+
+model ProjectStage {
+  id           String    @id @default(uuid())
+  project_id   String
+  title        String
+  subtitle     String?
+  description  String?
+  status_note  String?
+  position     Int
+  is_completed Boolean   @default(false)
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+}
+
 
