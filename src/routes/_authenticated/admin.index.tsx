@@ -208,72 +208,74 @@ function AdminOverview() {
   }
 
   return (
-    <>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold">Team Overview</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">Team Overview</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Real-time snapshot of task completion and team performance.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <CalendarRange className="h-4 w-4 text-muted-foreground" />
-          <Select value={range} onValueChange={(v) => setRange(v as RangeKey)}>
-            <SelectTrigger className="h-9 w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-              <SelectItem value="all">All time</SelectItem>
-              <SelectItem value="custom">Custom…</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+            <CalendarRange className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Select value={range} onValueChange={(v) => setRange(v as RangeKey)}>
+              <SelectTrigger className="h-9 w-full sm:w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="custom">Custom…</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {range === "custom" && (
-            <>
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
               <Input
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-9 w-[150px]"
+                className="h-9 flex-1 sm:w-[140px]"
               />
               <span className="text-xs text-muted-foreground">to</span>
               <Input
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="h-9 w-[150px]"
+                className="h-9 flex-1 sm:w-[140px]"
               />
-            </>
+            </div>
           )}
-          <Button size="sm" variant="outline" onClick={exportCSV}>
+          <Button size="sm" variant="outline" onClick={exportCSV} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
-              <s.icon className="h-4 w-4 text-brand-accent" />
+          <Card key={s.label} className="p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0 pb-1.5">
+              <CardTitle className="text-[11px] sm:text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
+              <s.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-brand-accent" />
             </CardHeader>
-            <CardContent>
-              <div className="font-display text-3xl font-bold">{s.value}</div>
+            <CardContent className="p-0">
+              <div className="font-display text-2xl sm:text-3xl font-bold">{s.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Tasks per team member</CardTitle>
-            <span className="text-xs text-muted-foreground">Click a bar to drill down</span>
+          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6 pb-2 sm:pb-4">
+            <CardTitle className="text-sm sm:text-base font-bold">Tasks per team member</CardTitle>
+            <span className="text-[11px] sm:text-xs text-muted-foreground">Click a bar to drill down</span>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="p-4 sm:p-6 pt-0 h-56 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={perMember}
@@ -344,10 +346,10 @@ function AdminOverview() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Status breakdown</CardTitle>
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+            <CardTitle className="text-sm sm:text-base font-bold">Status breakdown</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-72 flex-col gap-3">
+          <CardContent className="p-4 sm:p-6 pt-0 flex h-48 sm:h-72 flex-col gap-2">
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -355,8 +357,8 @@ function AdminOverview() {
                     data={statusData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={42}
-                    outerRadius={72}
+                    innerRadius={36}
+                    outerRadius={60}
                     paddingAngle={2}
                     stroke="none"
                   >
@@ -437,7 +439,7 @@ function AdminOverview() {
           {drill && <MemberDrill tasks={filtered.filter((t) => t.assigned_to === drill.id)} />}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
 

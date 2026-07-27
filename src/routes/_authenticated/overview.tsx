@@ -115,44 +115,44 @@ function UserOverview() {
   const completionRate = total > 0 ? Math.round((approvedTotal / total) * 100) : 0;
 
   return (
-    <div className="animate-fade-in">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="animate-fade-in space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold">
+          <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
             {greet}, {firstName}
           </h1>
-          <p className="text-sm text-muted-foreground">Your personal workspace snapshot.</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Your personal workspace snapshot.</p>
         </div>
         <Link
           to="/app"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-muted"
+          className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-white px-4 py-2 text-xs sm:text-sm font-medium shadow-sm transition hover:bg-muted w-full sm:w-auto"
         >
           Open my tasks <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} className="transition hover:-translate-y-0.5 hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
-              <s.icon className={`h-4 w-4 ${s.tone}`} />
+          <Card key={s.label} className="transition hover:-translate-y-0.5 hover:shadow-md p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0 pb-1.5">
+              <CardTitle className="text-[11px] sm:text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
+              <s.icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${s.tone}`} />
             </CardHeader>
-            <CardContent>
-              <div className="font-display text-3xl font-bold">{s.value}</div>
+            <CardContent className="p-0">
+              <div className="font-display text-2xl sm:text-3xl font-bold">{s.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Upcoming deadlines</CardTitle>
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+            <CardTitle className="text-sm sm:text-base font-bold">Upcoming deadlines</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="p-4 sm:p-6 pt-0 space-y-2">
             {upcoming.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
+              <div className="py-6 text-center text-xs sm:text-sm text-muted-foreground">
                 Nothing scheduled — nice work.
               </div>
             ) : (
@@ -160,11 +160,11 @@ function UserOverview() {
                 <Link
                   key={t.id}
                   to="/app"
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 transition hover:border-brand-accent/40 hover:bg-muted/60"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 p-2.5 sm:px-3 sm:py-2 transition hover:border-brand-accent/40 hover:bg-muted/60"
                 >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{t.title}</div>
-                    <div className="text-xs text-muted-foreground">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs sm:text-sm font-medium">{t.title}</div>
+                    <div className="text-[11px] text-muted-foreground">
                       Due{" "}
                       {new Date(t.deadline!).toLocaleDateString(undefined, {
                         month: "short",
@@ -172,11 +172,11 @@ function UserOverview() {
                       })}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Badge variant="outline" className={priorityColor(t.priority)}>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Badge variant="outline" className={`text-[10px] ${priorityColor(t.priority)}`}>
                       {t.priority}
                     </Badge>
-                    <Badge variant="outline" className={statusColor(t.status)}>
+                    <Badge variant="outline" className={`text-[10px] ${statusColor(t.status)}`}>
                       {t.status}
                     </Badge>
                   </div>
@@ -187,10 +187,10 @@ function UserOverview() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">My status</CardTitle>
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+            <CardTitle className="text-sm sm:text-base font-bold">My status</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-64 flex-col gap-3">
+          <CardContent className="p-4 sm:p-6 pt-0 flex h-48 sm:h-64 flex-col gap-2">
             <div className="min-h-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -198,8 +198,8 @@ function UserOverview() {
                     data={statusData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={40}
-                    outerRadius={68}
+                    innerRadius={32}
+                    outerRadius={56}
                     paddingAngle={2}
                     stroke="none"
                   >

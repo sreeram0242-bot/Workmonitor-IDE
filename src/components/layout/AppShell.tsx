@@ -259,7 +259,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             className={
               pathname === "/chat"
                 ? "page-view relative h-full"
-                : "page-view relative mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8"
+                : "page-view relative mx-auto max-w-[1400px] p-3.5 sm:p-6 lg:p-8"
             }
           >
             {children}
