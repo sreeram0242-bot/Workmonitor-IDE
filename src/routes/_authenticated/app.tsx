@@ -1,7 +1,6 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-// Removed supabase import
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -15,19 +14,23 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Loader2, ImagePlus, CheckCircle2, RotateCcw } from "lucide-react";
+import { Upload, Loader2, ImagePlus, CheckCircle2, RotateCcw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchTasksForUser,
   getCachedUserTasks,
+  fetchTeam,
+  getCachedTeam,
   priorityColor,
   sortByPriority,
   statusColor,
-  submitTaskProof,
+  submitTaskFinished,
   type TaskRow,
+  type TeamMember,
 } from "@/lib/tasks";
 import { SubtaskList } from "@/components/tasks/SubtaskList";
 import { TaskComments } from "@/components/tasks/TaskComments";
+import { TaskDetailModal } from "@/components/tasks/TaskDetailModal";
 import { sendNotifications } from "@/lib/notify";
 
 export const Route = createFileRoute("/_authenticated/app")({
@@ -55,21 +58,26 @@ function EmployeeHome() {
   const { loading, role, user, profile } = useAuth();
   const cached = user ? getCachedUserTasks(user.id) : null;
   const [tasks, setTasks] = useState<TaskRow[]>(cached ?? []);
+  const [team, setTeam] = useState<TeamMember[]>(() => getCachedTeam() ?? []);
   const [initial, setInitial] = useState(!cached);
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<"all" | "low" | "medium" | "high">("all");
+  const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [uploadTask, setUploadTask] = useState<TaskRow | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   async function reload() {
     if (!user) return;
-    const t = await fetchTasksForUser(user.id);
+    const [t, tm] = await Promise.all([fetchTasksForUser(user.id), fetchTeam()]);
     setTasks(t);
+    setTeam(tm);
     setInitial(false);
   }
 
   useEffect(() => {
     if (!user) return;
     reload();
-    // Realtime polling will be implemented in Stage 5
     return () => {};
   }, [user?.id]);
 
@@ -81,7 +89,6 @@ function EmployeeHome() {
       </div>
     );
   }
-  if (role === "admin") return <Navigate to="/admin" />;
 
   const q = search.trim().toLowerCase();
   const visible = sortByPriority(
@@ -197,10 +204,76 @@ function EmployeeHome() {
           </Card>
         ) : (
           <div className="space-y-6">
-            <Section title="To do" items={active} onChange={reload} />
-            <Section title="Awaiting review" items={submitted} onChange={reload} muted />
-            <Section title="Approved" items={done} onChange={reload} muted />
+            <Section
+              title="To do"
+              items={active}
+              team={team}
+              onChange={reload}
+              onSelectTask={(t) => {
+                setSelectedTask(t);
+                setDetailOpen(true);
+              }}
+              onOpenSubmit={(t) => {
+                setUploadTask(t);
+                setUploadOpen(true);
+              }}
+            />
+            <Section
+              title="Awaiting review"
+              items={submitted}
+              team={team}
+              onChange={reload}
+              muted
+              onSelectTask={(t) => {
+                setSelectedTask(t);
+                setDetailOpen(true);
+              }}
+              onOpenSubmit={(t) => {
+                setUploadTask(t);
+                setUploadOpen(true);
+              }}
+            />
+            <Section
+              title="Approved"
+              items={done}
+              team={team}
+              onChange={reload}
+              muted
+              onSelectTask={(t) => {
+                setSelectedTask(t);
+                setDetailOpen(true);
+              }}
+              onOpenSubmit={(t) => {
+                setUploadTask(t);
+                setUploadOpen(true);
+              }}
+            />
           </div>
+        )}
+
+        <TaskDetailModal
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          task={selectedTask}
+          team={team}
+          currentUserId={user?.id}
+          isAdmin={role === "admin"}
+          onDone={reload}
+          onOpenSubmitFinished={() => {
+            if (selectedTask) {
+              setUploadTask(selectedTask);
+              setUploadOpen(true);
+            }
+          }}
+        />
+
+        {uploadTask && (
+          <UploadProofDialog
+            open={uploadOpen}
+            onOpenChange={setUploadOpen}
+            task={uploadTask}
+            onDone={reload}
+          />
         )}
       </div>
     </div>
@@ -237,12 +310,18 @@ function StatChip({
 function Section({
   title,
   items,
+  team,
   onChange,
+  onSelectTask,
+  onOpenSubmit,
   muted,
 }: {
   title: string;
   items: TaskRow[];
+  team: TeamMember[];
   onChange: () => void;
+  onSelectTask: (t: TaskRow) => void;
+  onOpenSubmit: (t: TaskRow) => void;
   muted?: boolean;
 }) {
   if (items.length === 0) return null;
@@ -253,7 +332,15 @@ function Section({
       </div>
       <div className="space-y-2">
         {items.map((t) => (
-          <TaskChecklistItem key={t.id} task={t} onChange={onChange} muted={muted} />
+          <TaskChecklistItem
+            key={t.id}
+            task={t}
+            team={team}
+            onChange={onChange}
+            onSelectTask={() => onSelectTask(t)}
+            onOpenSubmit={() => onOpenSubmit(t)}
+            muted={muted}
+          />
         ))}
       </div>
     </div>
@@ -270,16 +357,24 @@ function isOverdue(t: TaskRow) {
 
 function TaskChecklistItem({
   task,
+  team,
   onChange,
+  onSelectTask,
+  onOpenSubmit,
   muted,
 }: {
   task: TaskRow;
+  team: TeamMember[];
   onChange: () => void;
+  onSelectTask: () => void;
+  onOpenSubmit: () => void;
   muted?: boolean;
 }) {
-  const [uploadOpen, setUploadOpen] = useState(false);
   const canComplete = task.status === "pending" || task.status === "revision";
   const overdue = isOverdue(task);
+
+  const assigner = team.find((m) => m.id === task.assigned_by);
+  const assignerName = assigner?.full_name || "Administrator";
 
   return (
     <div
@@ -289,13 +384,19 @@ function TaskChecklistItem({
         <Checkbox
           checked={!canComplete}
           disabled={!canComplete}
-          onCheckedChange={(v) => v && setUploadOpen(true)}
+          onCheckedChange={(v) => v && onOpenSubmit()}
           className="mt-1"
         />
-        <div className="min-w-0 flex-1">
+        <div
+          className="min-w-0 flex-1 cursor-pointer"
+          onClick={onSelectTask}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelectTask()}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <div
-              className={`font-medium ${!canComplete ? "line-through text-muted-foreground" : ""}`}
+              className={`font-semibold hover:text-[oklch(0.28_0.09_265)] transition-colors ${!canComplete ? "line-through text-muted-foreground" : ""}`}
             >
               {task.title}
             </div>
@@ -314,7 +415,7 @@ function TaskChecklistItem({
             {task.status === "revision" && <RotateCcw className="h-4 w-4 text-orange-500" />}
           </div>
           {task.description && (
-            <div className="mt-1 text-sm text-slate-600">{task.description}</div>
+            <div className="mt-1 text-sm text-slate-600 line-clamp-2">{task.description}</div>
           )}
           {Array.isArray(task.tags) && task.tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -328,13 +429,10 @@ function TaskChecklistItem({
               ))}
             </div>
           )}
-          {task.deadline && (
-            <div
-              className={`mt-2 text-xs ${overdue ? "text-red-600 font-medium" : "text-slate-500"}`}
-            >
-              Due {new Date(task.deadline).toLocaleString()}
-            </div>
-          )}
+          <div className="mt-2 text-xs text-slate-500">
+            Assigned by <span className="font-medium text-slate-700">{assignerName}</span>
+            {task.deadline && <> · due {new Date(task.deadline).toLocaleString()}</>}
+          </div>
           {task.revision_note && (
             <div className="mt-3 rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-xs text-orange-600 shadow-sm">
               <span className="font-semibold uppercase tracking-wider">Revision requested:</span>{" "}
@@ -344,26 +442,24 @@ function TaskChecklistItem({
           <div className="mt-4">
             <SubtaskList taskId={task.id} canEdit={false} canToggle={canComplete} />
           </div>
-          <div className="mt-4">
-            <TaskComments taskId={task.id} />
-          </div>
         </div>
-        {canComplete && (
-          <Button
-            size="sm"
-            variant="default"
-            className="bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)] text-white shadow hover:opacity-90 transition-opacity"
-            onClick={() => setUploadOpen(true)}
-          >
-            <ImagePlus className="mr-2 h-4 w-4" /> Complete
+
+        <div className="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="ghost" className="text-slate-500" onClick={onSelectTask}>
+            <Eye className="mr-1.5 h-4 w-4" /> Details
           </Button>
-        )}
-        <UploadProofDialog
-          open={uploadOpen}
-          onOpenChange={setUploadOpen}
-          task={task}
-          onDone={onChange}
-        />
+
+          {canComplete && (
+            <Button
+              size="sm"
+              variant="default"
+              className="bg-gradient-to-br from-[oklch(0.28_0.09_265)] to-[oklch(0.5_0.16_260)] text-white shadow hover:opacity-90 transition-opacity"
+              onClick={onOpenSubmit}
+            >
+              <ImagePlus className="mr-2 h-4 w-4" /> Complete
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -387,30 +483,33 @@ function UploadProofDialog({
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function submit() {
-    if (files.length === 0 || !user) return toast.error("Please choose at least one image");
+    if (!user) return;
     setBusy(true);
     try {
+      const payloadFiles: { fileBase64: string; fileName: string }[] = [];
       for (const file of files) {
-        // Read file as base64
         const buffer = await file.arrayBuffer();
         const base64 = Buffer.from(buffer).toString("base64");
-        await submitTaskProof(task.id, base64, file.name, note || null);
+        payloadFiles.push({ fileBase64: base64, fileName: file.name });
       }
+
+      await submitTaskFinished(task.id, payloadFiles, note || null);
+
       await sendNotifications([
         {
           user_id: task.assigned_by,
           type: "task_submitted",
-          message: `Proof submitted: ${task.title}`,
+          message: `Task submitted as finished: ${task.title}`,
           link: "/admin/tasks",
         },
       ]);
-      toast.success("Submitted for review");
+      toast.success("Submitted task as finished");
       setFiles([]);
       setNote("");
       onOpenChange(false);
       onDone();
     } catch (err: any) {
-      toast.error(err.message ?? "Upload failed");
+      toast.error(err.message ?? "Submission failed");
     } finally {
       setBusy(false);
     }
@@ -420,34 +519,48 @@ function UploadProofDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload proof for "{task.title}"</DialogTitle>
+          <DialogTitle>Submit "{task.title}" as Finished</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => inputRef.current?.click()}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
-            className="cursor-pointer rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center hover:bg-muted/50"
-          >
-            {files.length > 0 ? (
-              <div className="text-sm">
-                {files.length} file{files.length === 1 ? "" : "s"} selected — tap to add more
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                <Upload className="h-6 w-6" /> Tap to choose one or more images
-              </div>
-            )}
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
+          <div className="space-y-2">
+            <Label>Completion Note (optional)</Label>
+            <Textarea
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add details about what was completed…"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Proof Images (optional)</Label>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
+              className="cursor-pointer rounded-lg border border-dashed border-border bg-muted/30 p-5 text-center hover:bg-muted/50 transition-colors"
+            >
+              {files.length > 0 ? (
+                <div className="text-sm font-medium text-slate-700">
+                  {files.length} image{files.length === 1 ? "" : "s"} attached — tap to add more
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1.5 text-xs text-muted-foreground">
+                  <Upload className="h-5 w-5 text-slate-400" /> Tap to attach proof photos (optional)
+                </div>
+              )}
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
+              />
+            </div>
+          </div>
+
           {files.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {files.map((f, i) => (
@@ -467,17 +580,13 @@ function UploadProofDialog({
               ))}
             </div>
           )}
-          <div className="space-y-2">
-            <Label>Note (optional)</Label>
-            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={submit} disabled={busy || files.length === 0}>
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit
+          <Button onClick={submit} disabled={busy}>
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit as Finished
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -97,6 +97,8 @@ import {
   extractFirstUrl,
   parseEffect,
   encodeEffect,
+  fetchConversationsWithDetails,
+  fetchActiveChatData,
   MESSAGE_EFFECTS,
   type MessageEffect,
   type Conversation,
@@ -130,7 +132,7 @@ export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatPage,
 });
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string | Date): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
   const diff = Math.max(0, now - then);
@@ -267,29 +269,20 @@ function ChatPage() {
 
   async function reloadConversations() {
     if (!user) return;
-    const [convs, t, lr, mutesMap] = await Promise.all([
-      fetchMyConversations(user.id),
-      fetchTeam(),
-      fetchLastReadMap(user.id),
-      fetchMuteMap(user.id),
-    ]);
-    setConversations(convs);
-    setTeam(t);
-    setLastRead(lr);
-    setMutes(mutesMap);
-
-    const convIds = convs.map((c) => c.id);
-    const [memberResults, uc] = await Promise.all([
-      Promise.all(convs.map((c) => fetchConversationMembers(c.id))),
-      fetchUnreadCounts(user.id, convIds, lr),
-    ]);
-
-    const memberMap: Record<string, string[]> = {};
-    convs.forEach((c, idx) => {
-      memberMap[c.id] = memberResults[idx];
-    });
-    setConvMembers(memberMap);
-    setUnread(uc);
+    try {
+      const [res, t] = await Promise.all([
+        fetchConversationsWithDetails(),
+        fetchTeam(),
+      ]);
+      setConversations(res.conversations);
+      setConvMembers(res.membersMap);
+      setUnread(res.unreadMap);
+      setMutes(res.mutesMap);
+      setLastRead(res.lastReadMap);
+      setTeam(t);
+    } catch (e) {
+      console.error("Error reloading conversations", e);
+    }
   }
 
   useEffect(() => {
@@ -322,29 +315,27 @@ function ChatPage() {
       return;
     }
 
-    function loadChat() {
-      const id = activeId as string;
-      fetchMessages(id).then((msgs) => {
-        setMessages(msgs);
-        setHasMoreOlder(msgs.length >= MESSAGES_PAGE_SIZE);
-      });
-      fetchPinnedMessages(id).then(setPinned);
-      fetchReactions(id).then(setReactions);
-      fetchLastReadByMembers(id).then(setReadByMap);
-      markConversationRead(id, user!.id).then(() => {
-        setLastRead((prev) => ({ ...prev, [id]: new Date().toISOString() }));
-        setUnread((prev) => ({ ...prev, [id]: 0 }));
-      });
-    }
-
-    loadChat();
+    const id = activeId;
+    fetchActiveChatData(id).then((data) => {
+      if (activeIdRef.current !== id) return;
+      setMessages(data.messages);
+      setPinned(data.pinned);
+      setReactions(data.reactions);
+      setReadByMap(data.readByMap);
+      setHasMoreOlder(data.messages.length >= MESSAGES_PAGE_SIZE);
+      setLastRead((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+      setUnread((prev) => ({ ...prev, [id]: 0 }));
+    });
   }, [activeId, user?.id]);
 
   useRealtimeSubscription("chat", `message-${activeId}`, () => {
     if (!activeId || !user) return;
-    fetchMessages(activeId).then((msgs) => {
-      setMessages(msgs);
-      setHasMoreOlder(msgs.length >= MESSAGES_PAGE_SIZE);
+    fetchActiveChatData(activeId).then((data) => {
+      if (activeIdRef.current !== activeId) return;
+      setMessages(data.messages);
+      setPinned(data.pinned);
+      setReactions(data.reactions);
+      setReadByMap(data.readByMap);
     });
   });
 
@@ -1018,7 +1009,8 @@ function ChatPage() {
                         if (!activeId || messages.length === 0) return;
                         setLoadingOlder(true);
                         try {
-                          const older = await fetchOlderMessages(activeId, messages[0].created_at);
+                          const iso = typeof messages[0].created_at === "string" ? messages[0].created_at : new Date(messages[0].created_at).toISOString();
+                          const older = await fetchOlderMessages(activeId, iso);
                           setMessages((prev) => [...older, ...prev]);
                           if (older.length < MESSAGES_PAGE_SIZE) setHasMoreOlder(false);
                         } finally {
@@ -1039,7 +1031,7 @@ function ChatPage() {
                 {visibleMessages.map((m, idx) => {
                   const mine = m.sender_id === user?.id;
                   const sender = teamById.get(m.sender_id);
-                  const atts = m.attachments ?? [];
+                  const atts: ChatAttachment[] = (m.attachments as ChatAttachment[] | undefined) ?? [];
                   const prev = visibleMessages[idx - 1];
                   const showAvatar = !mine && (!prev || prev.sender_id !== m.sender_id);
                   const isDeleted = !!m.deleted_at;

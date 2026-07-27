@@ -50,7 +50,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const baseNav = isAdmin
     ? [
         { to: "/admin", label: "Overview", icon: LayoutDashboard, desc: "Dashboard & analytics" },
-        { to: "/admin/tasks", label: "Tasks", icon: ListChecks, desc: "Assign & review" },
+        { to: "/admin/tasks", label: "All Tasks", icon: ListChecks, desc: "Assign & review" },
+        { to: "/app", label: "My Tasks", icon: Kanban, desc: "Assigned to me" },
         { to: "/admin/calendar", label: "Calendar", icon: Calendar, desc: "Deadline view" },
         { to: "/admin/team", label: "Team", icon: Users, desc: "Members & roles" },
         { to: "/chat", label: "Chat", icon: MessageSquare, desc: "Messages & groups" },

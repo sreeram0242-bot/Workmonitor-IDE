@@ -206,6 +206,65 @@ export const submitTaskProof = createServerFn({ method: "POST" })
     return { success: true, url: uploadResult.secure_url };
   });
 
+export const submitTaskFinished = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      taskId: string;
+      files?: { fileBase64: string; fileName: string }[];
+      note?: string | null;
+    }) => data,
+  )
+  .handler(async ({ data: { taskId, files, note } }) => {
+    const authResult = await getAuthOrThrow();
+
+    if (files && files.length > 0) {
+      cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+      });
+
+      for (const file of files) {
+        const base64Data = `data:image/jpeg;base64,${file.fileBase64}`;
+        const uploadResult = await cloudinary.uploader.upload(base64Data, {
+          folder: `workmonitor/${authResult.userId}/${taskId}`,
+          public_id: `${Date.now()}-${file.fileName}`,
+          resource_type: "auto",
+        });
+
+        await prisma.taskProof.create({
+          data: {
+            task_id: taskId,
+            uploaded_by: authResult.userId,
+            image_url: uploadResult.secure_url,
+            note: note ?? null,
+          },
+        });
+      }
+    } else if (note) {
+      // If note only and no files, store note as proof entry without image or update task
+      // Option: create a proof entry if note is present
+      await prisma.taskProof.create({
+        data: {
+          task_id: taskId,
+          uploaded_by: authResult.userId,
+          image_url: "",
+          note: note,
+        },
+      });
+    }
+
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { status: "completed", revision_note: null },
+    });
+
+    await broadcast("tasks", "task-updates", { type: "task_finished", taskId });
+
+    return { success: true };
+  });
+
+
 export const fetchTaskComments = createServerFn({ method: "GET" })
   .validator((taskId: string) => taskId)
   .handler(async ({ data: taskId }) => {

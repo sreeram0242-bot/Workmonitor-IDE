@@ -27,6 +27,8 @@ import {
   renameGroup as serverRenameGroup,
   addGroupMembers as serverAddGroupMembers,
   removeGroupMember as serverRemoveGroupMember,
+  fetchConversationsWithDetails as serverFetchConversationsWithDetails,
+  fetchActiveChatData as serverFetchActiveChatData,
 } from "./chat.functions";
 
 export interface Conversation {
@@ -34,7 +36,7 @@ export interface Conversation {
   name: string | null;
   is_group: boolean;
   created_by: string;
-  created_at: string;
+  created_at: string | Date;
 }
 
 export interface ChatAttachment {
@@ -51,12 +53,12 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   content: string;
-  created_at: string;
-  edited_at?: string | null;
-  deleted_at?: string | null;
-  attachments?: ChatAttachment[];
+  created_at: string | Date;
+  edited_at?: string | Date | null;
+  deleted_at?: string | Date | null;
+  attachments?: ChatAttachment[] | any;
   reply_to?: string | null;
-  pinned_at?: string | null;
+  pinned_at?: string | Date | null;
   pinned_by?: string | null;
   forwarded_from?: string | null;
   mentions?: string[] | null;
@@ -296,3 +298,12 @@ export function parseEffect(content: string | null | undefined): {
 export function encodeEffect(effect: MessageEffect | null, text: string): string {
   return effect ? `[[fx:${effect}]] ${text}` : text;
 }
+
+export async function fetchConversationsWithDetails() {
+  return await serverFetchConversationsWithDetails();
+}
+
+export async function fetchActiveChatData(conversationId: string, limit?: number) {
+  return await serverFetchActiveChatData({ data: { conversationId, limit } });
+}
+

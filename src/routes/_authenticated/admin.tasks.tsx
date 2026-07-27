@@ -66,6 +66,7 @@ import { SubtaskList } from "@/components/tasks/SubtaskList";
 import { TagInput } from "@/components/tasks/TagInput";
 import { TaskComments } from "@/components/tasks/TaskComments";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TaskDetailModal } from "@/components/tasks/TaskDetailModal";
 
 export const Route = createFileRoute("/_authenticated/admin/tasks")({
   head: () => ({
@@ -108,6 +109,8 @@ function AdminTasks() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassignTo, setReassignTo] = useState("");
+  const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   function toggleSel(id: string) {
     setSelected((prev) => {
@@ -448,7 +451,12 @@ function AdminTasks() {
                     task={t}
                     team={team}
                     assigneeName={nameFor(t.assigned_to)}
+                    assignerName={nameFor(t.assigned_by)}
                     onChange={reloadTasks}
+                    onSelectTask={() => {
+                      setSelectedTask(t);
+                      setDetailOpen(true);
+                    }}
                     selected={selected.has(t.id)}
                     onToggleSelect={() => toggleSel(t.id)}
                   />
@@ -457,6 +465,16 @@ function AdminTasks() {
             </TabsContent>
           ))}
         </Tabs>
+
+        <TaskDetailModal
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          task={selectedTask}
+          team={team}
+          currentUserId={user?.id}
+          isAdmin={true}
+          onDone={reloadTasks}
+        />
       </div>
     </div>
   );
@@ -811,14 +829,18 @@ function TaskAdminRow({
   task,
   team,
   assigneeName,
+  assignerName,
   onChange,
+  onSelectTask,
   selected,
   onToggleSelect,
 }: {
   task: TaskRow;
   team: TeamMember[];
   assigneeName: string;
+  assignerName: string;
   onChange: () => void;
+  onSelectTask: () => void;
   selected: boolean;
   onToggleSelect: () => void;
 }) {
@@ -884,9 +906,17 @@ function TaskAdminRow({
         <div className="pt-1">
           <Checkbox checked={selected} onCheckedChange={onToggleSelect} aria-label="Select task" />
         </div>
-        <div className="min-w-0 flex-1">
+        <div
+          className="min-w-0 flex-1 cursor-pointer"
+          onClick={onSelectTask}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelectTask()}
+        >
           <div className="flex flex-wrap items-center gap-2">
-            <div className="font-medium">{task.title}</div>
+            <div className="font-semibold hover:text-[oklch(0.28_0.09_265)] transition-colors">
+              {task.title}
+            </div>
             <Badge variant="outline" className={priorityColor(task.priority)}>
               {task.priority}
             </Badge>
@@ -908,7 +938,7 @@ function TaskAdminRow({
             )}
           </div>
           {task.description && (
-            <div className="mt-1 text-sm text-slate-600">{task.description}</div>
+            <div className="mt-1 text-sm text-slate-600 line-clamp-2">{task.description}</div>
           )}
           {tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
@@ -923,7 +953,8 @@ function TaskAdminRow({
             </div>
           )}
           <div className="mt-2 text-xs text-slate-500">
-            Assigned to <span className="font-medium text-slate-700">{assigneeName}</span>
+            Assigned to <span className="font-medium text-slate-700">{assigneeName}</span> by{" "}
+            <span className="font-medium text-slate-700">{assignerName}</span>
             {task.deadline && <> · due {new Date(task.deadline).toLocaleString()}</>}
           </div>
           {task.revision_note && (

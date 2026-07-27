@@ -16,6 +16,7 @@ import {
   updateTask as serverUpdateTask,
   deleteTask as serverDeleteTask,
   submitTaskProof as serverSubmitTaskProof,
+  submitTaskFinished as serverSubmitTaskFinished,
   fetchTaskComments as serverFetchTaskComments,
   addTaskComment as serverAddTaskComment,
   deleteTaskComment as serverDeleteTaskComment,
@@ -204,6 +205,15 @@ export async function submitTaskProof(
 ) {
   return await serverSubmitTaskProof({ data: { taskId, fileBase64, fileName, note } });
 }
+
+export async function submitTaskFinished(
+  taskId: string,
+  files?: { fileBase64: string; fileName: string }[],
+  note?: string | null,
+) {
+  return await serverSubmitTaskFinished({ data: { taskId, files, note } });
+}
+
 
 export async function fetchTaskComments(taskId: string) {
   return await serverFetchTaskComments({ data: taskId });

@@ -493,3 +493,103 @@ export const removeGroupMember = createServerFn({ method: "POST" })
     });
     return true;
   });
+
+export const fetchConversationsWithDetails = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const authResult = await getAuthOrThrow();
+    const userId = authResult.userId;
+
+    const memberships = await prisma.conversationMember.findMany({
+      where: { user_id: userId },
+      select: { conversation_id: true, last_read_at: true, muted_at: true },
+    });
+    const convIds = memberships.map((m) => m.conversation_id);
+    if (convIds.length === 0) {
+      return { conversations: [], membersMap: {}, unreadMap: {}, mutesMap: {}, lastReadMap: {} };
+    }
+
+    const [conversations, allMembers] = await Promise.all([
+      prisma.conversation.findMany({
+        where: { id: { in: convIds } },
+        orderBy: { created_at: "desc" },
+      }),
+      prisma.conversationMember.findMany({
+        where: { conversation_id: { in: convIds } },
+        select: { conversation_id: true, user_id: true },
+      }),
+    ]);
+
+    const lastReadMap: Record<string, string> = {};
+    const mutesMap: Record<string, boolean> = {};
+    memberships.forEach((m) => {
+      if (m.last_read_at) lastReadMap[m.conversation_id] = (m.last_read_at as Date).toISOString();
+      mutesMap[m.conversation_id] = !!m.muted_at;
+    });
+
+    const membersMap: Record<string, string[]> = {};
+    allMembers.forEach((m) => {
+      if (!membersMap[m.conversation_id]) membersMap[m.conversation_id] = [];
+      membersMap[m.conversation_id].push(m.user_id);
+    });
+
+    const unreadMap: Record<string, number> = {};
+    await Promise.all(
+      convIds.map(async (cid) => {
+        const since = lastReadMap[cid] ? new Date(lastReadMap[cid]) : new Date(0);
+        const count = await prisma.message.count({
+          where: {
+            conversation_id: cid,
+            sender_id: { not: userId },
+            created_at: { gt: since },
+          },
+        });
+        unreadMap[cid] = count;
+      }),
+    );
+
+    return { conversations, membersMap, unreadMap, mutesMap, lastReadMap };
+  },
+);
+
+export const fetchActiveChatData = createServerFn({ method: "POST" })
+  .validator((data: { conversationId: string; limit?: number }) => data)
+  .handler(async ({ data: { conversationId, limit = 50 } }) => {
+    const authResult = await getAuthOrThrow();
+
+    const [messages, pinned, reactions, members] = await Promise.all([
+      prisma.message.findMany({
+        where: { conversation_id: conversationId },
+        orderBy: { created_at: "desc" },
+        take: limit,
+      }),
+      prisma.message.findMany({
+        where: { conversation_id: conversationId, pinned_at: { not: null } },
+        orderBy: { pinned_at: "desc" },
+      }),
+      prisma.messageReaction.findMany({
+        where: { message: { conversation_id: conversationId } },
+      }),
+      prisma.conversationMember.findMany({
+        where: { conversation_id: conversationId },
+        select: { user_id: true, last_read_at: true },
+      }),
+    ]);
+
+    await prisma.conversationMember.updateMany({
+      where: { conversation_id: conversationId, user_id: authResult.userId },
+      data: { last_read_at: new Date() },
+    });
+
+    const readByMap: Record<string, string> = {};
+    members.forEach((m) => {
+      if (m.last_read_at) readByMap[m.user_id] = (m.last_read_at as Date).toISOString();
+    });
+
+    return {
+      messages: messages.slice().reverse(),
+      pinned,
+      reactions,
+      readByMap,
+    };
+  });
+
