@@ -126,13 +126,25 @@ function attachmentKind(mime: string): "image" | "video" | "file" | "audio" {
   return "file";
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 export async function uploadChatAttachment(
   conversationId: string,
   userId: string,
   file: File,
 ): Promise<ChatAttachment> {
-  const buffer = await file.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
+  const base64 = await fileToBase64(file);
   return (await serverUploadChatAttachment({
     data: {
       conversationId,

@@ -465,6 +465,19 @@ function TaskChecklistItem({
   );
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
 function UploadProofDialog({
   open,
   onOpenChange,
@@ -488,8 +501,7 @@ function UploadProofDialog({
     try {
       const payloadFiles: { fileBase64: string; fileName: string }[] = [];
       for (const file of files) {
-        const buffer = await file.arrayBuffer();
-        const base64 = Buffer.from(buffer).toString("base64");
+        const base64 = await fileToBase64(file);
         payloadFiles.push({ fileBase64: base64, fileName: file.name });
       }
 
