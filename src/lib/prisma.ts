@@ -22,9 +22,24 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.pool = pool;
 
 const adapter = new PrismaPg(pool);
 
-export const prisma =
-  globalForPrisma.prisma && (globalForPrisma.prisma as any).project
-    ? globalForPrisma.prisma
-    : new PrismaClient({ adapter });
+function getPrismaInstance(): PrismaClient {
+  if (globalForPrisma.prisma && (globalForPrisma.prisma as any).project) {
+    return globalForPrisma.prisma;
+  }
+  const client = new PrismaClient({ adapter });
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = client;
+  }
+  return client;
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const instance = getPrismaInstance() as any;
+    const value = Reflect.get(instance, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(instance);
+    }
+    return value;
+  },
+});
