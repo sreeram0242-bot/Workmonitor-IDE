@@ -111,12 +111,31 @@ function ProjectsPage() {
   }, [projects, selectedId, filtered]);
 
   async function handleSetStage(projectId: string, stageIndex: number) {
+    // 0ms Instant Optimistic UI Update
+    setProjects((prev) =>
+      prev.map((p) => {
+        if (p.id !== projectId) return p;
+        const stages = p.stages || [];
+        const newStages = stages.map((s, idx) => ({
+          ...s,
+          is_completed: idx <= stageIndex,
+          completed_at: idx <= stageIndex ? s.completed_at || new Date() : null,
+        }));
+        return {
+          ...p,
+          current_stage_index: stageIndex,
+          status: stageIndex >= newStages.length - 1 ? "completed" : "in_progress",
+          stages: newStages,
+        };
+      }),
+    );
+    toast.success("Stage updated!");
+
     try {
-      const updated = await setCurrentStage(projectId, stageIndex);
-      setProjects((prev) => prev.map((p) => (p.id === projectId ? updated : p)));
-      toast.success("Stage updated!");
+      await setCurrentStage(projectId, stageIndex);
     } catch (e: any) {
-      toast.error(e.message || "Failed to update stage");
+      toast.error(e.message || "Failed to update stage on server");
+      reload();
     }
   }
 
@@ -258,8 +277,8 @@ function ProjectsPage() {
                         variant="outline"
                         className={
                           p.status === "completed"
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
-                            : "border-teal-500/30 bg-teal-500/10 text-teal-700"
+                            ? "border-blue-500/30 bg-blue-500/10 text-blue-700 font-semibold"
+                            : "border-blue-500/30 bg-blue-500/10 text-blue-700 font-semibold"
                         }
                       >
                         {p.status === "completed" ? "Done" : "In Progress"}
@@ -280,7 +299,7 @@ function ProjectsPage() {
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                         <div
-                          className="h-full bg-teal-500 rounded-full transition-all duration-500"
+                          className="h-full bg-blue-600 rounded-full transition-all duration-500"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -569,6 +588,14 @@ function EditProjectDialog({
   );
 }
 
+function toDatetimeLocal(iso: string | Date | null | undefined): string {
+  if (!iso) return new Date().toISOString().slice(0, 16);
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function EditStageDialog({
   open,
   onOpenChange,
@@ -584,6 +611,8 @@ function EditStageDialog({
   const [subtitle, setSubtitle] = useState(stage.subtitle ?? "");
   const [description, setDescription] = useState(stage.description ?? "");
   const [statusNote, setStatusNote] = useState(stage.status_note ?? "");
+  const [dateMode, setDateMode] = useState<"automatic" | "manual">("automatic");
+  const [manualDateTime, setManualDateTime] = useState<string>(() => toDatetimeLocal(stage.completed_at));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -591,19 +620,27 @@ function EditStageDialog({
     setSubtitle(stage.subtitle ?? "");
     setDescription(stage.description ?? "");
     setStatusNote(stage.status_note ?? "");
+    setManualDateTime(toDatetimeLocal(stage.completed_at));
+    setDateMode("automatic");
   }, [stage]);
 
   async function save() {
     if (!title.trim()) return toast.error("Title required");
     setBusy(true);
     try {
+      const finalCompletedAt =
+        dateMode === "manual" && manualDateTime
+          ? new Date(manualDateTime).toISOString()
+          : stage.completed_at || new Date().toISOString();
+
       await updateProjectStage(stage.id, {
         title,
         subtitle: subtitle || null,
         description: description || null,
         status_note: statusNote || null,
+        completed_at: finalCompletedAt,
       });
-      toast.success("Stage text updated");
+      toast.success("Stage text and timestamp updated!");
       onOpenChange(false);
       onDone();
     } catch (e: any) {
@@ -654,12 +691,39 @@ function EditStageDialog({
               placeholder="e.g. Package has reached the local delivery hub"
             />
           </div>
+
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <Label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Stage Date & Time Entry
+            </Label>
+            <Select value={dateMode} onValueChange={(v) => setDateMode(v as "automatic" | "manual")}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="automatic">Automatic (Current Date & Time)</SelectItem>
+                <SelectItem value="manual">Manual Entry (Custom Date & Time)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {dateMode === "manual" && (
+              <div className="mt-2 space-y-1.5 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                <Label className="text-xs text-blue-900 font-semibold">Select Date & Time</Label>
+                <Input
+                  type="datetime-local"
+                  value={manualDateTime}
+                  onChange={(e) => setManualDateTime(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={busy}>
+          <Button onClick={save} disabled={busy} className="bg-blue-600 hover:bg-blue-700 text-white">
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Stage
           </Button>
         </DialogFooter>

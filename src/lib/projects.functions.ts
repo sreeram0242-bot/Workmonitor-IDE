@@ -133,19 +133,28 @@ export const setCurrentStage = createServerFn({ method: "POST" })
       orderBy: { position: "asc" },
     });
 
-    // Update stages completion status
-    await Promise.all(
-      stages.map((stage, idx) => {
-        const isCompleted = idx <= stageIndex;
-        return prisma.projectStage.update({
-          where: { id: stage.id },
-          data: {
-            is_completed: isCompleted,
-            completed_at: isCompleted ? (stage.completed_at || new Date()) : null,
-          },
-        });
-      }),
-    );
+    const targetStageId = stages[stageIndex]?.id;
+
+    // Bulk update completed stages <= stageIndex in 1 query
+    if (stageIndex >= 0 && stages.length > 0) {
+      const completedStageIds = stages.slice(0, stageIndex + 1).map((s) => s.id);
+      const upcomingStageIds = stages.slice(stageIndex + 1).map((s) => s.id);
+
+      await Promise.all([
+        completedStageIds.length > 0
+          ? prisma.projectStage.updateMany({
+              where: { id: { in: completedStageIds } },
+              data: { is_completed: true },
+            })
+          : Promise.resolve(),
+        upcomingStageIds.length > 0
+          ? prisma.projectStage.updateMany({
+              where: { id: { in: upcomingStageIds } },
+              data: { is_completed: false, completed_at: null },
+            })
+          : Promise.resolve(),
+      ]);
+    }
 
     const updatedProject = await prisma.project.update({
       where: { id: projectId },
@@ -160,11 +169,11 @@ export const setCurrentStage = createServerFn({ method: "POST" })
       },
     });
 
-    await broadcast("projects", "project-updates", {
+    broadcast("projects", "project-updates", {
       type: "stage_changed",
       projectId,
       stageIndex,
-    });
+    }).catch(() => {});
 
     return updatedProject;
   });
@@ -207,6 +216,7 @@ export const updateProjectStage = createServerFn({ method: "POST" })
       subtitle?: string | null;
       description?: string | null;
       status_note?: string | null;
+      completed_at?: Date | string | null;
     }) => data,
   )
   .handler(async ({ data: { id, ...updates } }) => {
