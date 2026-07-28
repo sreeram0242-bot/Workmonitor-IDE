@@ -89,6 +89,12 @@ export function NotificationsBell() {
             }
           : undefined,
       });
+      // Vibrate device for all standard in-app notifications (tasks, messages, mentions)
+      try {
+        if (typeof window !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      } catch (e) {}
     }
   });
 
