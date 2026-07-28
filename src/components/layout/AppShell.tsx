@@ -178,7 +178,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{profile?.full_name || user?.email}</div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate text-sm font-bold text-slate-900">{profile?.full_name || user?.email}</span>
+              <span className="shrink-0 inline-flex items-center rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-1.5 py-0.2 text-[9px] font-bold">
+                {isAdmin ? "Admin" : "User"}
+              </span>
+            </div>
             <div className="truncate text-[10px] text-sidebar-foreground/60">
               {profile?.position || (isAdmin ? "Admin" : "Employee")}
             </div>
@@ -230,16 +235,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Logo showText={false} className="h-8 w-8" />
             </div>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
                 {profile?.full_name || user?.email}
               </span>
-              <span className="hidden rounded-full border border-border/70 bg-secondary/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-block">
+              <span className="shrink-0 inline-flex items-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 text-[10px] font-bold tracking-wider">
                 {isAdmin ? "Admin" : "User"}
               </span>
             </div>
-            <div className="truncate text-xs text-muted-foreground">
+            <div className="truncate text-xs font-medium text-slate-500 dark:text-slate-400">
               {profile?.position || (isAdmin ? "Administrator" : "Team member")}
             </div>
           </div>
