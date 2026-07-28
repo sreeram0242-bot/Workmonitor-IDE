@@ -23,20 +23,22 @@ export function OneSignalInit() {
         await OneSignal.init({
           appId: appId,
           allowLocalhostAsSecureOrigin: true,
-          serviceWorkerPath: "OneSignalSDKWorker.js",
+          serviceWorkerPath: "/OneSignalSDKWorker.js",
           serviceWorkerParam: { scope: "/" },
           notifyButton: {
-            enable: false,
+            enable: true,
           },
         });
 
-        // Prompt for notification permission on initial load if supported
+        // Prompt for web notification permission on PC/browser
         if (
           OneSignal.Notifications &&
-          typeof OneSignal.Notifications.requestPermission === "function" &&
-          OneSignal.Notifications.permission !== true
+          typeof OneSignal.Notifications.requestPermission === "function"
         ) {
           await OneSignal.Notifications.requestPermission();
+        }
+        if (OneSignal.Slidedown && typeof OneSignal.Slidedown.promptPush === "function") {
+          await OneSignal.Slidedown.promptPush();
         }
       } catch (err) {
         console.error("OneSignal init error:", err);
