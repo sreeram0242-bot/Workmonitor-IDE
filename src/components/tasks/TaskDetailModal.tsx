@@ -64,6 +64,9 @@ export function TaskDetailModal({
   const [revisionNote, setRevisionNote] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [extendedDeadline, setExtendedDeadline] = useState("");
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [newDeadline, setNewDeadline] = useState("");
 
   useEffect(() => {
     if (!open || !task) {
@@ -130,10 +133,6 @@ export function TaskDetailModal({
       setBusy(false);
     }
   }
-
-  const [extendedDeadline, setExtendedDeadline] = useState("");
-  const [showExtendModal, setShowExtendModal] = useState(false);
-  const [newDeadline, setNewDeadline] = useState("");
 
   async function handleExtendDeadline() {
     if (!task || !newDeadline) return;
