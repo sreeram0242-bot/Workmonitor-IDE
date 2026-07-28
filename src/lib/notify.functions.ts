@@ -139,3 +139,85 @@ export const clearNotifications = createServerFn({ method: "POST" }).handler(asy
   });
   return true;
 });
+
+export const sendUrgentBroadcastAlert = createServerFn({ method: "POST" })
+  .validator((data: { title: string; message: string; link?: string }) => data)
+  .handler(async ({ data: { title, message, link } }) => {
+    const authResult = await getAuthOrThrow();
+
+    // Verify admin role
+    const profile = await prisma.profile.findUnique({
+      where: { id: authResult.userId },
+      select: { role: true },
+    });
+    if (profile?.role !== "admin") {
+      throw new Error("Only admins can send urgent broadcast alerts");
+    }
+
+    // Fetch all team user IDs
+    const allProfiles = await prisma.profile.findMany({ select: { id: true } });
+    if (allProfiles.length > 0) {
+      await prisma.notification.createMany({
+        data: allProfiles.map((p) => ({
+          user_id: p.id,
+          type: "urgent_alert",
+          message: `🚨 ${title}: ${message}`,
+          link: link || "/app",
+        })),
+      });
+    }
+
+    // Send High-Priority OneSignal Push Notification to ALL devices
+    const appId =
+      process.env.VITE_ONESIGNAL_APP_ID ||
+      (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
+      "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+    const apiKey =
+      process.env.VITE_ONESIGNAL_API_KEY ||
+      (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||
+      "os_v2_app_tni5z32s2ngkjlgbsnqv5ocgnjtaiftlgkdedu4xzavskcq4tyrrhhhluxeDcJHrrHSgvFpsYxqb6g97uaQTd2kE31rPUeDZTeDsjVq";
+
+    if (appId && apiKey) {
+      try {
+        const response = await fetch("https://onesignal.com/api/v1/notifications", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${apiKey}`,
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            included_segments: ["Subscribed Users"],
+            headings: { en: `🚨 ${title || "URGENT ALERT"}` },
+            contents: { en: message },
+            priority: 10,
+            android_sound: "alarm",
+            ios_sound: "alarm.wav",
+            android_visibility: 1,
+            android_channel_id: "urgent_alert",
+            data: { type: "urgent_alert", link: link || "/app" },
+          }),
+        });
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error("OneSignal Broadcast Error:", response.status, errText);
+        }
+      } catch (err) {
+        console.error("Failed to send OneSignal urgent broadcast:", err);
+      }
+    }
+
+    // Broadcast real-time websocket
+    try {
+      await broadcast("notifications", "all-users", {
+        type: "urgent_alert",
+        title,
+        message,
+      });
+    } catch (err) {
+      console.error("Ably broadcast error:", err);
+    }
+
+    return true;
+  });
+

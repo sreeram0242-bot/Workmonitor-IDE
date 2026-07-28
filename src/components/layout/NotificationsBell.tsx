@@ -80,6 +80,16 @@ export function NotificationsBell() {
     reload();
   });
 
+  useRealtimeSubscription("notifications", "all-users", (msg: any) => {
+    reload();
+    if (msg?.data?.type === "urgent_alert") {
+      toast.error(`🚨 ${msg.data.title || "URGENT ALERT"}`, {
+        description: msg.data.message,
+        duration: 15000,
+      });
+    }
+  });
+
   // Re-render relative timestamps every 60s while dropdown is open
   useEffect(() => {
     if (!open) return;

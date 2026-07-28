@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { ShortcutsHelp } from "@/components/layout/ShortcutsHelp";
+import { UrgentAlertModal } from "@/components/admin/UrgentAlertModal";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, profile, user } = useAuth();
@@ -241,6 +242,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {isAdmin && <UrgentAlertModal />}
             <GlobalSearch />
             <ShortcutsHelp />
             <NotificationsBell />
