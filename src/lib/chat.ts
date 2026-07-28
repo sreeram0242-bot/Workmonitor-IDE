@@ -106,8 +106,8 @@ export async function sendMessage(
   content: string,
   attachments: ChatAttachment[] = [],
   extras: { reply_to?: string | null; forwarded_from?: string | null; mentions?: string[] } = {},
-) {
-  await serverSendMessage({
+): Promise<Message> {
+  return (await serverSendMessage({
     data: {
       conversationId,
       content,
@@ -116,7 +116,7 @@ export async function sendMessage(
       forwardedFrom: extras.forwarded_from,
       mentions: extras.mentions,
     },
-  });
+  })) as any;
 }
 
 function attachmentKind(mime: string): "image" | "video" | "file" | "audio" {

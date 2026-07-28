@@ -395,7 +395,7 @@ function ChatPage() {
         });
 
         // Swap temporary message with real DB message
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? (realMsg as Message) : m)));
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? (realMsg as unknown as Message) : m)));
 
         markConversationRead(activeId, user.id).catch(() => {});
         const members = convMembers[activeId] ?? [];
