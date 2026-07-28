@@ -27,10 +27,15 @@ export function UrgentAlertReceiver() {
         message: msg.data.message || "",
         link: msg.data.link || "/app",
       });
-      // Play system alert sound if available
+      // Play system alert sound & trigger device vibration pattern
       try {
         const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
         audio.play().catch(() => {});
+      } catch (e) {}
+      try {
+        if (typeof window !== "undefined" && "vibrate" in navigator) {
+          navigator.vibrate([500, 200, 500, 200, 500, 200, 1000]);
+        }
       } catch (e) {}
     }
   });
