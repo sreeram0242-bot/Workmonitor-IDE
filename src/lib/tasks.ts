@@ -86,6 +86,7 @@ export function compareTaskPriority(a: TaskRow, b: TaskRow): number {
 }
 
 export function sortByPriority(tasks: TaskRow[]): TaskRow[] {
+  if (!Array.isArray(tasks)) return [];
   return [...tasks].sort(compareTaskPriority);
 }
 

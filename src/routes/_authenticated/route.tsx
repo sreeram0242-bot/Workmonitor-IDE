@@ -15,7 +15,9 @@ function AuthenticatedLayout() {
   const withinGrace = backgroundedAt > 0 && Date.now() - backgroundedAt < 60_000;
 
   if (typeof window !== "undefined" && !unlocked && !withinGrace) {
-    return <Navigate to="/lock" search={{ redirect: window.location.pathname }} replace />;
+    const currentPath = window.location.pathname;
+    const redirectTarget = currentPath && currentPath !== "/lock" ? currentPath : "/app";
+    return <Navigate to="/lock" search={{ redirect: redirectTarget }} replace />;
   }
 
   if (typeof window !== "undefined" && !unlocked && withinGrace) {

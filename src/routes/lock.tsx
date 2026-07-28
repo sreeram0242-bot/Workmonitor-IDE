@@ -37,6 +37,11 @@ function LockPage() {
       navigate({ to: "/auth" });
       return;
     }
+    if (typeof window !== "undefined" && sessionStorage.getItem("wm_unlocked") === "1") {
+      const target = redirect && redirect !== "/lock" ? redirect : "/app";
+      navigate({ to: target as any, replace: true });
+      return;
+    }
 
     (async () => {
       try {
@@ -45,12 +50,10 @@ function LockPage() {
       } catch (e: any) {
         console.error(e);
         toast.error("Failed to connect to server. Please try refreshing.");
-        // Fallback to unlock mode so it doesn't freeze completely,
-        // though the next submit will likely fail too if the server is down.
         setMode("unlock");
       }
     })();
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, redirect]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -84,7 +87,8 @@ function LockPage() {
     if (id) {
       localStorage.setItem(`wm_last_active:${id}`, String(Date.now()));
     }
-    navigate({ to: redirect || "/app", replace: true });
+    const target = redirect && redirect !== "/lock" ? redirect : "/app";
+    navigate({ to: target as any, replace: true });
   }
 
   async function handleForgot() {
