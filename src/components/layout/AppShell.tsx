@@ -235,7 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Logo showText={false} className="h-8 w-8" />
             </div>
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="hidden sm:block min-w-0 flex-1">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
                 {profile?.full_name || user?.email}
