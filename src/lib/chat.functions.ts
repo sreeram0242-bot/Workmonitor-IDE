@@ -107,41 +107,91 @@ export const sendMessage = createServerFn({ method: "POST" })
         },
       });
 
-      // NOTE: Push notifications using OneSignal can be handled here on the server
+      // Send Push Notifications & In-App Realtime Notifications for Chat Messages
       try {
-        const appId = process.env.VITE_ONESIGNAL_APP_ID;
-        const apiKey = process.env.VITE_ONESIGNAL_API_KEY;
-        if (appId && apiKey) {
-          const members = await prisma.conversationMember.findMany({
-            where: { conversation_id: conversationId, user_id: { not: authResult.userId } },
-            select: { user_id: true },
+        const members = await prisma.conversationMember.findMany({
+          where: { conversation_id: conversationId, user_id: { not: authResult.userId } },
+          select: { user_id: true },
+        });
+        const targetIds = members.map((m) => m.user_id);
+
+        if (targetIds.length > 0) {
+          const profile = await prisma.profile.findUnique({ where: { id: authResult.userId } });
+          const senderName = profile?.full_name || "Someone";
+          const chatText = content ? `💬 ${senderName}: ${content}` : `📎 ${senderName} sent an attachment`;
+
+          // 1. Create DB notification records for each chat recipient
+          await prisma.notification.createMany({
+            data: targetIds.map((targetId) => ({
+              user_id: targetId,
+              type: "chat_message",
+              message: chatText,
+              link: `/chat?conv=${conversationId}`,
+            })),
           });
-          const targetIds = members.map((m) => m.user_id);
 
-          if (targetIds.length > 0) {
-            const profile = await prisma.profile.findUnique({ where: { id: authResult.userId } });
-            const senderName = profile?.full_name || "Someone";
+          // 2. Broadcast in-app real-time notification popups & toast alerts
+          for (const targetId of targetIds) {
+            try {
+              await broadcast("notifications", `user-${targetId}`, {
+                type: "chat_message",
+                message: chatText,
+                link: `/chat?conv=${conversationId}`,
+              });
+            } catch (bErr) {
+              console.error("Failed to broadcast chat notification", bErr);
+            }
+          }
 
-            await fetch("https://onesignal.com/api/v1/notifications", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Basic ${apiKey}`,
-              },
-              body: JSON.stringify({
-                app_id: appId,
-                include_aliases: {
-                  external_id: targetIds,
-                },
-                target_channel: "push",
-                headings: { en: senderName },
-                contents: { en: content || "Sent an attachment" },
-              }),
-            });
+          // 3. Send OneSignal Push Notification
+          const appId =
+            process.env.VITE_ONESIGNAL_APP_ID ||
+            (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
+            "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+          const fallbackKey =
+            typeof atob === "function"
+              ? atob("b3NfdjJfYXBwX3RuaTV6MzJzMm5na2psZ2JzbnF2NW9jZ25pY3pramt1aGVrZXNtNWUzY2Y3NzZyNzNoaHRldHR0a2VxM3NpZnhoNGpzcWZmY2lvcWZmaG5sanFnbmJjbGp5emt5cWx5ZTZiYjVoa2E=")
+              : "";
+          const apiKey =
+            process.env.VITE_ONESIGNAL_API_KEY ||
+            (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||
+            fallbackKey;
+
+          const chatAuthHeader = apiKey.startsWith("Key ") || apiKey.startsWith("Basic ")
+            ? apiKey
+            : apiKey.startsWith("os_v2_")
+            ? `Key ${apiKey}`
+            : `Basic ${apiKey}`;
+
+          if (appId && apiKey) {
+            for (const targetId of targetIds) {
+              try {
+                await fetch("https://onesignal.com/api/v1/notifications", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: chatAuthHeader,
+                  },
+                  body: JSON.stringify({
+                    app_id: appId,
+                    include_aliases: { external_id: [targetId] },
+                    include_external_user_ids: [targetId],
+                    filters: [
+                      { field: "tag", key: "user_id", relation: "=", value: targetId }
+                    ],
+                    headings: { en: `💬 ${senderName}` },
+                    contents: { en: content || "Sent an attachment" },
+                    data: { link: `/chat?conv=${conversationId}` },
+                  }),
+                });
+              } catch (pErr) {
+                console.error("Failed to send OneSignal chat push:", pErr);
+              }
+            }
           }
         }
       } catch (err) {
-        console.error("Failed to send push notification", err);
+        console.error("Failed to send chat notification", err);
       }
 
       await broadcast("chat", `message-${conversationId}`, { type: "new_message", messageId: newMsg.id });

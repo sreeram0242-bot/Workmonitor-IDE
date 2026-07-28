@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Siren, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
@@ -20,6 +19,21 @@ export function UrgentAlertReceiver() {
     link?: string;
   } | null>(null);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const vibrateIntervalRef = useRef<any>(null);
+
+  const handleClose = () => {
+    setActiveAlert(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    if (vibrateIntervalRef.current) {
+      clearInterval(vibrateIntervalRef.current);
+      vibrateIntervalRef.current = null;
+    }
+  };
+
   useRealtimeSubscription("notifications", "all-users", (msg: any) => {
     const payload = msg?.data ?? msg;
     if (payload?.type === "urgent_alert" || payload?.title || payload?.message) {
@@ -28,14 +42,25 @@ export function UrgentAlertReceiver() {
         message: payload.message || "",
         link: payload.link || "/app",
       });
-      // Play system alert sound & trigger device vibration pattern
+
+      // Play continuous looping siren/alarm sound until user clicks close
       try {
-        const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-        audio.play().catch(() => {});
+        if (!audioRef.current) {
+          audioRef.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+        }
+        audioRef.current.loop = true;
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(() => {});
       } catch (e) {}
+
+      // Trigger repeating device vibration pattern until closed
       try {
         if (typeof window !== "undefined" && "vibrate" in navigator) {
+          if (vibrateIntervalRef.current) clearInterval(vibrateIntervalRef.current);
           navigator.vibrate([500, 200, 500, 200, 500, 200, 1000]);
+          vibrateIntervalRef.current = setInterval(() => {
+            navigator.vibrate([500, 200, 500, 200, 500, 200, 1000]);
+          }, 3500);
         }
       } catch (e) {}
     }
@@ -44,7 +69,7 @@ export function UrgentAlertReceiver() {
   if (!activeAlert) return null;
 
   return (
-    <Dialog open={!!activeAlert} onOpenChange={(open) => !open && setActiveAlert(null)}>
+    <Dialog open={!!activeAlert} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="max-w-md border-2 border-rose-500 bg-rose-950/95 text-rose-50 backdrop-blur-md sm:rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <DialogHeader className="space-y-2">
           <div className="flex items-center justify-between">
@@ -58,7 +83,7 @@ export function UrgentAlertReceiver() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setActiveAlert(null)}
+              onClick={handleClose}
               className="h-8 w-8 rounded-full text-rose-200 hover:bg-rose-900/60 hover:text-white"
               aria-label="Close message"
             >
@@ -79,7 +104,7 @@ export function UrgentAlertReceiver() {
           {activeAlert.link && (
             <Link
               to={activeAlert.link as any}
-              onClick={() => setActiveAlert(null)}
+              onClick={handleClose}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-300 hover:text-white underline underline-offset-4"
             >
               <span>View details</span>
@@ -90,7 +115,7 @@ export function UrgentAlertReceiver() {
           {/* Big Prominent Close Button */}
           <Button
             type="button"
-            onClick={() => setActiveAlert(null)}
+            onClick={handleClose}
             className="bg-white text-rose-950 hover:bg-rose-100 font-bold px-5 h-9 rounded-lg gap-2 shadow-lg"
           >
             <X className="h-4 w-4" />
