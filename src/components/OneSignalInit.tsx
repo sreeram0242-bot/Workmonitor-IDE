@@ -65,16 +65,17 @@ export function OneSignalInit() {
 
     // Median (GoNative) App Wrapper Push registration if running as native mobile app
     const g = (window as any).gonative || (window as any).median;
-    if (g && g.onesignal) {
+    const os = g?.oneSignal || g?.onesignal;
+    if (os) {
       try {
-        if (typeof g.onesignal.register === "function") {
-          g.onesignal.register({ userId: user.id });
+        if (typeof os.register === "function") {
+          os.register({ userId: user.id });
         }
-        if (g.onesignal.user && typeof g.onesignal.user.setExternalUserId === "function") {
-          g.onesignal.user.setExternalUserId({ externalId: user.id });
+        if (os.user && typeof os.user.setExternalUserId === "function") {
+          os.user.setExternalUserId({ externalId: user.id });
         }
-        if (g.onesignal.tags && typeof g.onesignal.tags.setTags === "function") {
-          g.onesignal.tags.setTags({ user_id: user.id });
+        if (os.tags && typeof os.tags.setTags === "function") {
+          os.tags.setTags({ user_id: user.id });
         }
       } catch (err) {
         console.error("Median OneSignal registration error:", err);
