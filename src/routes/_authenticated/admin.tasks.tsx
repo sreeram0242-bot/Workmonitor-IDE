@@ -125,15 +125,25 @@ function AdminTasks() {
   }
 
   async function reloadTasks() {
-    const t = await fetchTasksForAdmin();
-    setTasks(t);
-    setLoading(false);
+    try {
+      const t = await fetchTasksForAdmin();
+      setTasks(t);
+    } catch (e) {
+      console.error("Error loading admin tasks:", e);
+    } finally {
+      setLoading(false);
+    }
   }
   async function reloadAll() {
-    const [t, m] = await Promise.all([fetchTasksForAdmin(), fetchTeam()]);
-    setTasks(t);
-    setTeam(m);
-    setLoading(false);
+    try {
+      const [t, m] = await Promise.all([fetchTasksForAdmin(), fetchTeam()]);
+      setTasks(t);
+      setTeam(m);
+    } catch (e) {
+      console.error("Error loading admin data:", e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {

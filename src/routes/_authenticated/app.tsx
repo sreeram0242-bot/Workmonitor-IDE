@@ -69,21 +69,26 @@ function EmployeeHome() {
 
   async function reload() {
     if (!user) return;
-    const [t, tm] = await Promise.all([fetchTasksForUser(user.id), fetchTeam()]);
-    setTasks(t);
-    setTeam(tm);
-    setInitial(false);
+    try {
+      const [t, tm] = await Promise.all([fetchTasksForUser(user.id), fetchTeam()]);
+      setTasks(t);
+      setTeam(tm);
 
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search);
-      const taskId = p.get("task");
-      if (taskId) {
-        const found = t.find((item) => item.id === taskId);
-        if (found) {
-          setSelectedTask(found);
-          setDetailOpen(true);
+      if (typeof window !== "undefined") {
+        const p = new URLSearchParams(window.location.search);
+        const taskId = p.get("task");
+        if (taskId) {
+          const found = t.find((item) => item.id === taskId);
+          if (found) {
+            setSelectedTask(found);
+            setDetailOpen(true);
+          }
         }
       }
+    } catch (e) {
+      console.error("Error loading user tasks:", e);
+    } finally {
+      setInitial(false);
     }
   }
 
