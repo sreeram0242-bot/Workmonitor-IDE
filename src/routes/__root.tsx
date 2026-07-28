@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 import { Toaster, toast } from "sonner";
 import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { AuthProvider } from "@/hooks/use-auth";
+import { OneSignalInit } from "@/components/OneSignalInit";
 
 import appCss from "../styles.css?url";
 
@@ -93,6 +94,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&family=DM+Serif+Display&family=Fira+Sans:wght@400;500;600&display=swap",
       },
     ],
+    scripts: [
+      {
+        src: "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js",
+        defer: true,
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -135,6 +142,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <OneSignalInit />
         <Outlet />
         <Toaster position="top-right" richColors closeButton />
       </AuthProvider>

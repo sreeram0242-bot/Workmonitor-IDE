@@ -59,12 +59,19 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
     });
 
     // Send Push Notifications via OneSignal
-    const appId = process.env.VITE_ONESIGNAL_APP_ID;
-    const apiKey = process.env.VITE_ONESIGNAL_API_KEY;
+    const appId =
+      process.env.VITE_ONESIGNAL_APP_ID ||
+      (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
+      "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+    const apiKey =
+      process.env.VITE_ONESIGNAL_API_KEY ||
+      (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||
+      "os_v2_app_tni5z32s2ngkjlgbsnqv5ocgnjtaiftlgkdedu4xzavskcq4tyrrhhhluxeDcJHrrHSgvFpsYxqb6g97uaQTd2kE31rPUeDZTeDsjVq";
+
     if (appId && apiKey) {
       for (const it of filtered) {
         try {
-          await fetch("https://onesignal.com/api/v1/notifications", {
+          const response = await fetch("https://onesignal.com/api/v1/notifications", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -73,12 +80,17 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
             body: JSON.stringify({
               app_id: appId,
               include_aliases: { external_id: [it.user_id] },
+              include_external_user_ids: [it.user_id],
               target_channel: "push",
               headings: { en: "WorkMonitor" },
               contents: { en: it.message },
               data: { link: it.link },
             }),
           });
+          if (!response.ok) {
+            const errBody = await response.text();
+            console.error("OneSignal push API response error:", response.status, errBody);
+          }
         } catch (err) {
           console.error("OneSignal push error:", err);
         }

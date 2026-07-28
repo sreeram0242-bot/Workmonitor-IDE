@@ -24,9 +24,14 @@ export async function scheduleOneSignalNotification(
   message: string,
   sendAfter: Date,
 ) {
-  const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-  const apiKey = import.meta.env.VITE_ONESIGNAL_API_KEY;
-  if (!appId || !apiKey) return;
+  const appId =
+    (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
+    process.env.VITE_ONESIGNAL_APP_ID ||
+    "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+  const apiKey =
+    (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||
+    process.env.VITE_ONESIGNAL_API_KEY ||
+    "os_v2_app_tni5z32s2ngkjlgbsnqv5ocgnjtaiftlgkdedu4xzavskcq4tyrrhhhluxeDcJHrrHSgvFpsYxqb6g97uaQTd2kE31rPUeDZTeDsjVq";
 
   try {
     await fetch("https://onesignal.com/api/v1/notifications", {
@@ -38,6 +43,7 @@ export async function scheduleOneSignalNotification(
       body: JSON.stringify({
         app_id: appId,
         include_aliases: { external_id: [userId] },
+        include_external_user_ids: [userId],
         target_channel: "push",
         headings: { en: title },
         contents: { en: message },
