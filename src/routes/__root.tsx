@@ -44,19 +44,33 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  console.error("Root Error Component caught:", error);
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-xl text-center space-y-4">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-left font-mono text-xs text-red-800 shadow-sm overflow-x-auto max-h-60">
+            <div className="font-bold text-red-900 mb-1">
+              Error Details: {error.message || String(error)}
+            </div>
+            {error.stack && (
+              <pre className="whitespace-pre-wrap text-[11px] text-red-700/90 leading-relaxed">
+                {error.stack}
+              </pre>
+            )}
+          </div>
+        )}
+
+        <div className="pt-2 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
               router.invalidate();
