@@ -25,6 +25,7 @@ import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { ShortcutsHelp } from "@/components/layout/ShortcutsHelp";
 import { UrgentAlertModal } from "@/components/admin/UrgentAlertModal";
+import { UrgentAlertReceiver } from "@/components/admin/UrgentAlertReceiver";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { role, profile, user } = useAuth();
@@ -197,6 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
+      <UrgentAlertReceiver />
       <aside className="hidden w-72 flex-col md:flex">{SidebarInner}</aside>
 
       {/* Mobile drawer */}
