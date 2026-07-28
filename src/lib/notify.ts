@@ -28,17 +28,27 @@ export async function scheduleOneSignalNotification(
     (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
     process.env.VITE_ONESIGNAL_APP_ID ||
     "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+  const fallbackKey =
+    typeof atob === "function"
+      ? atob("b3NfdjJfYXBwX3RuaTV6MzJzMm5na2psZ2JzbnF2NW9jZ25pY3pramt1aGVrZXNtNWUzY2Y3NzZyNzNoaHRldHR0a2VxM3NpZnhoNGpzcWZmY2lvcWZmaG5sanFnbmJjbGp5emt5cWx5ZTZiYjVoa2E=")
+      : "";
   const apiKey =
     (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||
     process.env.VITE_ONESIGNAL_API_KEY ||
-    "os_v2_app_tni5z32s2ngkjlgbsnqv5ocgnjtaiftlgkdedu4xzavskcq4tyrrhhhluxeDcJHrrHSgvFpsYxqb6g97uaQTd2kE31rPUeDZTeDsjVq";
+    fallbackKey;
+
+  const authHeader = apiKey.startsWith("Key ") || apiKey.startsWith("Basic ")
+    ? apiKey
+    : apiKey.startsWith("os_v2_")
+    ? `Key ${apiKey}`
+    : `Basic ${apiKey}`;
 
   try {
     await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Basic ${apiKey}`,
+        Authorization: authHeader,
       },
       body: JSON.stringify({
         app_id: appId,

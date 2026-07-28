@@ -1,5 +1,0 @@
-VITE_ONESIGNAL_APP_ID
-9b51dcef-52d3-4ca4-acc1-93615eb8466a
-
-VITE_ONESIGNAL_API_KEY
-os_v2_app_tni5z32s2ngkjlgbsnqv5ocgnjtaiftlgkdedu4xzavskcq4tyrrhhhluxeDcJHrrHSgvFpsYxqb6g97uaQTd2kE31rPUeDZTeDsjVq
