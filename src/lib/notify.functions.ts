@@ -81,7 +81,9 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
               app_id: appId,
               include_aliases: { external_id: [it.user_id] },
               include_external_user_ids: [it.user_id],
-              target_channel: "push",
+              filters: [
+                { field: "tag", key: "user_id", relation: "=", value: it.user_id }
+              ],
               headings: { en: "WorkMonitor" },
               contents: { en: it.message },
               data: { link: it.link },
@@ -186,7 +188,7 @@ export const sendUrgentBroadcastAlert = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             app_id: appId,
-            included_segments: ["Subscribed Users"],
+            included_segments: ["Subscribed Users", "Total Subscriptions", "Active Users", "All"],
             headings: { en: `🚨 ${title || "URGENT ALERT"}` },
             contents: { en: message },
             priority: 10,
