@@ -70,6 +70,9 @@ export function TaskDetailModal({
       setProofs([]);
       setShowRevisionInput(false);
       setRevisionNote("");
+      setShowExtendModal(false);
+      setExtendedDeadline("");
+      setNewDeadline("");
       return;
     }
 

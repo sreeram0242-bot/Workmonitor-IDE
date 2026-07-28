@@ -147,7 +147,21 @@ function AdminTasks() {
         reloadTasks();
       }, 400);
     };
-    // Realtime polling will be implemented in Stage 5
+    // Auto-open task detail modal if URL query param ?task=<id> exists
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const taskId = p.get("task");
+      if (taskId) {
+        fetchTasksForAdmin().then((list) => {
+          const target = list.find((t) => t.id === taskId);
+          if (target) {
+            setSelectedTask(target);
+            setDetailOpen(true);
+          }
+        });
+      }
+    }
+
     return () => {};
   }, []);
 
@@ -184,7 +198,16 @@ function AdminTasks() {
     return Array.from(s).sort();
   }, [tasks]);
 
-  const [activeTab, setActiveTab] = useState<string>("completed");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const st = p.get("status");
+      if (st && ["completed", "pending", "overdue", "revision", "approved"].includes(st)) {
+        return st;
+      }
+    }
+    return "completed";
+  });
 
   const overdueCount = filtered.filter(isOverdue).length;
 

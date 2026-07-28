@@ -73,6 +73,18 @@ function EmployeeHome() {
     setTasks(t);
     setTeam(tm);
     setInitial(false);
+
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      const taskId = p.get("task");
+      if (taskId) {
+        const found = t.find((item) => item.id === taskId);
+        if (found) {
+          setSelectedTask(found);
+          setDetailOpen(true);
+        }
+      }
+    }
   }
 
   useEffect(() => {
