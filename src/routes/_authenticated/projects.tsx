@@ -40,6 +40,7 @@ import {
   addProjectStage,
   updateProjectStage,
   deleteProjectStage,
+  reorderProjectStages,
   type ProjectRow,
   type ProjectStageRow,
 } from "@/lib/projects";
@@ -159,6 +160,26 @@ function ProjectsPage() {
       reload();
     } catch (e: any) {
       toast.error(e.message || "Failed to delete stage");
+    }
+  }
+
+  async function handleReorderStage(projectId: string, fromIdx: number, toIdx: number) {
+    const proj = projects.find((p) => p.id === projectId);
+    if (!proj || !proj.stages || toIdx < 0 || toIdx >= proj.stages.length) return;
+    const newStages = [...proj.stages];
+    const [moved] = newStages.splice(fromIdx, 1);
+    newStages.splice(toIdx, 0, moved);
+
+    // Smooth optimistic local state update
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, stages: newStages } : p)),
+    );
+    try {
+      await reorderProjectStages(projectId, newStages.map((s) => s.id));
+      toast.success("Stage reordered");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to reorder stage");
+      reload();
     }
   }
 
@@ -363,6 +384,7 @@ function ProjectsPage() {
                     }
                     onDeleteStage={handleDeleteStage}
                     onAddStage={(projectId) => setAddStageProjectId(projectId)}
+                    onReorderStage={handleReorderStage}
                   />
                 </Card>
               ) : (

@@ -235,25 +235,27 @@ export const deleteProjectStage = createServerFn({ method: "POST" })
   .handler(async ({ data: id }) => {
     await requireAdmin();
     const stage = await prisma.projectStage.findUnique({ where: { id } });
-    if (!stage) return false;
-
+    if (!stage) return true;
     await prisma.projectStage.delete({ where: { id } });
-
-    // Reorder remaining stages
-    const remaining = await prisma.projectStage.findMany({
-      where: { project_id: stage.project_id },
-      orderBy: { position: "asc" },
+    await broadcast("projects", "project-updates", {
+      type: "stage_deleted",
+      projectId: stage.project_id,
     });
+    return true;
+  });
 
+export const reorderProjectStages = createServerFn({ method: "POST" })
+  .validator((data: { projectId: string; stageIds: string[] }) => data)
+  .handler(async ({ data: { projectId, stageIds } }) => {
+    await requireAdmin();
     await Promise.all(
-      remaining.map((s, idx) =>
+      stageIds.map((id, index) =>
         prisma.projectStage.update({
-          where: { id: s.id },
-          data: { position: idx },
+          where: { id },
+          data: { position: index },
         }),
       ),
     );
-
-    await broadcast("projects", "project-updates", { type: "stage_deleted", projectId: stage.project_id });
+    await broadcast("projects", "project-updates", { type: "stage_reordered", projectId });
     return true;
   });

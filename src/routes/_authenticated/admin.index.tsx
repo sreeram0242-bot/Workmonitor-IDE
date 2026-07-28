@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Clock, ListChecks, Users, Download, CalendarRange } from "lucide-react";
@@ -141,14 +141,25 @@ function AdminOverview() {
   const nameFor = new Map(team.map((m) => [m.id, m.full_name]));
 
   const stats = [
-    { label: "Team members", value: team.length, icon: Users },
-    { label: "Pending", value: filtered.filter((t) => t.status === "pending").length, icon: Clock },
+    { label: "Team members", value: team.length, icon: Users, to: "/admin/team" },
+    {
+      label: "Pending",
+      value: filtered.filter((t) => t.status === "pending").length,
+      icon: Clock,
+      to: "/admin/tasks?status=pending",
+    },
     {
       label: "Awaiting review",
       value: filtered.filter((t) => t.status === "completed").length,
       icon: ListChecks,
+      to: "/admin/tasks?status=completed",
     },
-    { label: "Approved in range", value: approvedInRange, icon: CheckCircle2 },
+    {
+      label: "Approved in range",
+      value: approvedInRange,
+      icon: CheckCircle2,
+      to: "/admin/tasks?status=approved",
+    },
   ];
 
   const recent = filtered.slice(0, 6);
@@ -257,15 +268,19 @@ function AdminOverview() {
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
         {stats.map((s) => (
-          <Card key={s.label} className="p-3 sm:p-4">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0 pb-1.5">
-              <CardTitle className="text-[11px] sm:text-xs font-medium text-muted-foreground">{s.label}</CardTitle>
-              <s.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-brand-accent" />
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="font-display text-2xl sm:text-3xl font-bold">{s.value}</div>
-            </CardContent>
-          </Card>
+          <Link key={s.label} to={s.to as any} className="block group">
+            <Card className="p-3 sm:p-4 transition-all duration-200 group-hover:border-blue-500/40 group-hover:shadow-md group-hover:scale-[1.02] cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0 pb-1.5">
+                <CardTitle className="text-[11px] sm:text-xs font-medium text-muted-foreground group-hover:text-blue-600 transition-colors">
+                  {s.label}
+                </CardTitle>
+                <s.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-brand-accent group-hover:text-blue-600 transition-colors" />
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="font-display text-2xl sm:text-3xl font-bold">{s.value}</div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

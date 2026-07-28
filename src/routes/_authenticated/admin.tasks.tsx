@@ -184,13 +184,16 @@ function AdminTasks() {
     return Array.from(s).sort();
   }, [tasks]);
 
+  const [activeTab, setActiveTab] = useState<string>("completed");
+
   const overdueCount = filtered.filter(isOverdue).length;
 
   const buckets = {
-    pending: filtered.filter((t) => t.status === "pending"),
     completed: filtered.filter((t) => t.status === "completed"),
-    approved: filtered.filter((t) => t.status === "approved"),
+    pending: filtered.filter((t) => t.status === "pending"),
+    overdue: filtered.filter(isOverdue),
     revision: filtered.filter((t) => t.status === "revision"),
+    approved: filtered.filter((t) => t.status === "approved"),
   };
 
   const selectedIds = Array.from(selected);
@@ -346,10 +349,24 @@ function AdminTasks() {
         )}
 
         {overdueCount > 0 && (
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600 shadow-sm backdrop-blur">
-            <AlertTriangle className="h-4 w-4" />{" "}
-            <span className="font-medium">
-              {overdueCount} overdue task{overdueCount === 1 ? "" : "s"} need attention
+          <div
+            onClick={() => {
+              setActiveTab("overdue");
+              if (buckets.overdue.length > 0) {
+                setSelectedTask(buckets.overdue[0]);
+                setDetailOpen(true);
+              }
+            }}
+            className="mb-4 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 shadow-sm backdrop-blur cursor-pointer hover:bg-red-500/20 transition-all group"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 animate-pulse" />
+              <span className="font-semibold">
+                {overdueCount} overdue task{overdueCount === 1 ? "" : "s"} need attention
+              </span>
+            </div>
+            <span className="text-xs font-bold underline underline-offset-2 text-red-600 group-hover:text-red-800">
+              Click to view task details →
             </span>
           </div>
         )}
@@ -426,15 +443,21 @@ function AdminTasks() {
           </DialogContent>
         </Dialog>
 
-        <Tabs defaultValue="completed" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="flex w-full justify-start overflow-x-auto whitespace-nowrap rounded-xl bg-white/60 p-1 border border-black/5">
             <TabsTrigger value="completed">Review ({buckets.completed.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({buckets.pending.length})</TabsTrigger>
+            <TabsTrigger
+              value="overdue"
+              className={buckets.overdue.length > 0 ? "text-red-600 font-bold" : ""}
+            >
+              Overdue ({buckets.overdue.length})
+            </TabsTrigger>
             <TabsTrigger value="revision">Revisions ({buckets.revision.length})</TabsTrigger>
             <TabsTrigger value="approved">Approved ({buckets.approved.length})</TabsTrigger>
           </TabsList>
 
-          {(["completed", "pending", "revision", "approved"] as const).map((k) => (
+          {(["completed", "pending", "overdue", "revision", "approved"] as const).map((k) => (
             <TabsContent key={k} value={k} className="mt-4 space-y-3">
               {loading ? (
                 <div className="flex items-center justify-center py-10 text-slate-500">
@@ -503,6 +526,7 @@ function AssignTaskDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [deadline, setDeadline] = useState("");
   const [recurrence, setRecurrence] = useState<TaskRecurrence>("none");
@@ -510,43 +534,62 @@ function AssignTaskDialog({
   const [saving, setSaving] = useState(false);
 
   async function submit() {
-    if (!title || !assignedTo) {
-      toast.error("Title and assignee are required");
+    if (!title) {
+      toast.error("Title is required");
       return;
     }
+    let targetAssignees: string[] = [];
+    if (assignedTo === "all") {
+      targetAssignees = team.map((m) => m.id);
+    } else if (assignedTo === "multiple") {
+      targetAssignees = selectedMembers;
+    } else if (assignedTo) {
+      targetAssignees = [assignedTo];
+    }
+
+    if (targetAssignees.length === 0) {
+      toast.error("Please select at least one assignee");
+      return;
+    }
+
     setSaving(true);
     let error: any = null;
     try {
-      await createTask({
-        title,
-        description: description || null,
-        assigned_to: assignedTo,
-        assigned_by: adminId,
-        priority,
-        status: "pending",
-        deadline: deadline ? new Date(deadline).toISOString() : null,
-        recurrence,
-        tags,
-      });
+      await Promise.all(
+        targetAssignees.map(async (uid) => {
+          await createTask({
+            title,
+            description: description || null,
+            assigned_to: uid,
+            assigned_by: adminId,
+            priority,
+            status: "pending",
+            deadline: deadline ? new Date(deadline).toISOString() : null,
+            recurrence,
+            tags,
+          });
+        }),
+      );
     } catch (e: any) {
       error = e;
     }
     if (!error) {
-      await sendNotifications([
-        {
-          user_id: assignedTo,
+      await sendNotifications(
+        targetAssignees.map((uid) => ({
+          user_id: uid,
           type: "task_assigned",
-          message: `New task: ${title}`,
+          message: `New task assigned: ${title}`,
           link: "/app",
-        },
-      ]);
+        })),
+      );
     }
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success("Task assigned");
+    toast.success(`Task assigned to ${targetAssignees.length} member${targetAssignees.length === 1 ? "" : "s"}`);
     setTitle("");
     setDescription("");
     setAssignedTo("");
+    setSelectedMembers([]);
     setPriority("medium");
     setDeadline("");
     setRecurrence("none");
@@ -588,12 +631,18 @@ function AssignTaskDialog({
               <Label>Assign to</Label>
               <Select value={assignedTo} onValueChange={setAssignedTo}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose member" />
+                  <SelectValue placeholder="Choose member(s)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all" className="font-bold text-blue-600">
+                    🌟 All Members ({team.length})
+                  </SelectItem>
+                  <SelectItem value="multiple" className="font-semibold text-purple-600">
+                    👥 Select Multiple Members
+                  </SelectItem>
                   {team.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.full_name} · {m.position}
+                      {m.full_name} · {m.position || "Member"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -613,6 +662,45 @@ function AssignTaskDialog({
               </Select>
             </div>
           </div>
+          {assignedTo === "multiple" && (
+            <div className="space-y-2 rounded-xl border border-purple-200 bg-purple-50/50 p-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-purple-900">
+                <span>Select Team Members ({selectedMembers.length} selected):</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedMembers(
+                      selectedMembers.length === team.length ? [] : team.map((m) => m.id),
+                    )
+                  }
+                  className="text-[11px] underline text-purple-700 hover:text-purple-900"
+                >
+                  {selectedMembers.length === team.length ? "Deselect All" : "Select All"}
+                </button>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-1.5 pt-1">
+                {team.map((m) => (
+                  <label
+                    key={m.id}
+                    className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer hover:text-slate-900"
+                  >
+                    <Checkbox
+                      checked={selectedMembers.includes(m.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedMembers((prev) => [...prev, m.id]);
+                        } else {
+                          setSelectedMembers((prev) => prev.filter((id) => id !== m.id));
+                        }
+                      }}
+                    />
+                    <span>{m.full_name}</span>
+                    {m.position && <span className="text-[10px] text-slate-400">({m.position})</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Deadline (optional)</Label>
             <Input
@@ -953,7 +1041,7 @@ function TaskAdminRow({
             </div>
           )}
           <div className="mt-2 text-xs text-slate-500">
-            Assigned to <span className="font-medium text-slate-700">{assigneeName}</span> by{" "}
+            Assigned to <span className="font-bold text-blue-600 dark:text-blue-400">{assigneeName}</span> by{" "}
             <span className="font-medium text-slate-700">{assignerName}</span>
             {task.deadline && <> · due {new Date(task.deadline).toLocaleString()}</>}
           </div>

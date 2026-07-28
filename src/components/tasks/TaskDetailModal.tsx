@@ -128,6 +128,33 @@ export function TaskDetailModal({
     }
   }
 
+  const [extendedDeadline, setExtendedDeadline] = useState("");
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [newDeadline, setNewDeadline] = useState("");
+
+  async function handleExtendDeadline() {
+    if (!task || !newDeadline) return;
+    setBusy(true);
+    try {
+      await updateTask(task.id, { deadline: new Date(newDeadline).toISOString() });
+      await sendNotifications([
+        {
+          user_id: task.assigned_to,
+          type: "task_extended",
+          message: `Deadline extended for: ${task.title}`,
+          link: "/app",
+        },
+      ]);
+      toast.success("Deadline extended successfully");
+      setShowExtendModal(false);
+      onDone?.();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to extend deadline");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRequestRevision() {
     if (!task) return;
     if (!revisionNote.trim()) {
@@ -136,16 +163,26 @@ export function TaskDetailModal({
     }
     setBusy(true);
     try {
-      await updateTask(task.id, { status: "revision", revision_note: revisionNote.trim() });
+      const updates: any = { status: "revision", revision_note: revisionNote.trim() };
+      if (extendedDeadline) {
+        updates.deadline = new Date(extendedDeadline).toISOString();
+      } else if (task.deadline) {
+        // Auto extend deadline by 48 hours for revision if no date picked
+        const base = new Date(task.deadline > new Date().toISOString() ? task.deadline : new Date().toISOString());
+        base.setDate(base.getDate() + 2);
+        updates.deadline = base.toISOString();
+      }
+
+      await updateTask(task.id, updates);
       await sendNotifications([
         {
           user_id: task.assigned_to,
           type: "task_revision",
-          message: `Revision requested for: ${task.title}`,
+          message: `Revision requested (deadline updated) for: ${task.title}`,
           link: "/app",
         },
       ]);
-      toast.success("Revision requested");
+      toast.success("Revision requested with extended deadline");
       setShowRevisionInput(false);
       onOpenChange(false);
       onDone?.();
@@ -207,13 +244,52 @@ export function TaskDetailModal({
             </div>
 
             {task.deadline && (
-              <div className="flex items-center gap-2.5">
-                <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
-                <div>
-                  <span className="text-slate-500">Deadline: </span>
-                  <span className={`font-semibold ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                    {new Date(task.deadline).toLocaleString()}
-                  </span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                  <div>
+                    <span className="text-slate-500">Deadline: </span>
+                    <span className={`font-semibold ${isOverdue ? "text-red-600 font-bold" : "text-slate-800"}`}>
+                      {new Date(task.deadline).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[11px] text-blue-600 hover:bg-blue-50 font-bold"
+                    onClick={() => {
+                      setNewDeadline(task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : "");
+                      setShowExtendModal((prev) => !prev);
+                    }}
+                  >
+                    Extend Deadline
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {showExtendModal && isAdmin && (
+              <div className="col-span-full space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                <Label className="text-xs font-semibold text-blue-900">
+                  Select New Extended Deadline
+                </Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={newDeadline}
+                    onChange={(e) => setNewDeadline(e.target.value)}
+                    className="h-8 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleExtendDeadline}
+                    disabled={busy || !newDeadline}
+                    className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                  >
+                    {busy && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Save Extension
+                  </Button>
                 </div>
               </div>
             )}
@@ -329,9 +405,20 @@ export function TaskDetailModal({
                 value={revisionNote}
                 onChange={(e) => setRevisionNote(e.target.value)}
                 placeholder="Explain what needs to be changed or improved…"
-                className="bg-white"
+                className="bg-white text-sm"
               />
-              <div className="flex justify-end gap-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] font-semibold text-orange-900">
+                  Extended Deadline for Revision (Optional / Defaults to +48h)
+                </Label>
+                <input
+                  type="datetime-local"
+                  value={extendedDeadline}
+                  onChange={(e) => setExtendedDeadline(e.target.value)}
+                  className="h-8 w-full rounded-md border border-orange-300 bg-white px-2 text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
                 <Button size="sm" variant="ghost" onClick={() => setShowRevisionInput(false)}>
                   Cancel
                 </Button>

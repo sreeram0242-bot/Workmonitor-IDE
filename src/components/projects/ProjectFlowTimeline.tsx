@@ -1,5 +1,17 @@
 import React from "react";
-import { Check, Clock, ChevronRight, Edit3, Trash2, Plus, Sparkles, AlertCircle } from "lucide-react";
+import {
+  Check,
+  Clock,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Edit3,
+  Trash2,
+  Plus,
+  Sparkles,
+  AlertCircle,
+  GripVertical,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type ProjectRow, type ProjectStageRow } from "@/lib/projects";
@@ -11,6 +23,7 @@ interface ProjectFlowTimelineProps {
   onEditStage?: (stage: ProjectStageRow) => void;
   onDeleteStage?: (stageId: string) => void;
   onAddStage?: (projectId: string) => void;
+  onReorderStage?: (projectId: string, fromIndex: number, toIndex: number) => void;
 }
 
 export function ProjectFlowTimeline({
@@ -20,6 +33,7 @@ export function ProjectFlowTimeline({
   onEditStage,
   onDeleteStage,
   onAddStage,
+  onReorderStage,
 }: ProjectFlowTimelineProps) {
   const stages = project.stages || [];
   const currentIdx = project.current_stage_index ?? 0;
@@ -153,7 +167,31 @@ export function ProjectFlowTimeline({
 
                   {/* Actions for Admin */}
                   {isAdmin && (
-                    <div className="flex items-center gap-1.5 opacity-90 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-90 transition-opacity">
+                      {onReorderStage && stages.length > 1 && (
+                        <div className="flex items-center gap-0.5 border-r border-slate-200 pr-1 mr-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={idx === 0}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-30"
+                            onClick={() => onReorderStage(project.id, idx, idx - 1)}
+                            title="Move Stage Up"
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={idx === stages.length - 1}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-30"
+                            onClick={() => onReorderStage(project.id, idx, idx + 1)}
+                            title="Move Stage Down"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                       {!isCurrent && onSetCurrentStage && (
                         <Button
                           size="sm"

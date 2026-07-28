@@ -356,57 +356,82 @@ function ChatPage() {
     const reply = replyTo;
     const effect = pendingEffect;
     const mentionIds = extractMentions(content, team);
+    const encoded = encodeEffect(effect, content);
+
+    // 1. Optimistic Message Insertion (0ms latency for UI)
+    const tempId = `temp-${Date.now()}`;
+    const tempMsg: Message = {
+      id: tempId,
+      conversation_id: activeId,
+      sender_id: user.id,
+      content: encoded,
+      created_at: new Date().toISOString(),
+      attachments: files.map((f) => ({
+        path: f.name,
+        url: "",
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        kind: f.type.startsWith("image/") ? "image" : "file",
+      })),
+      reply_to: reply?.id ?? null,
+      mentions: mentionIds,
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
     setInput("");
     setPendingFiles([]);
     setReplyTo(null);
     setPendingEffect(null);
-    setUploading(true);
-    try {
-      const attachments: ChatAttachment[] = [];
-      for (const f of files) attachments.push(await uploadChatAttachment(activeId, user.id, f));
-      const encoded = encodeEffect(effect, content);
-      await sendMessage(activeId, user.id, encoded, attachments, {
-        reply_to: reply?.id ?? null,
-        mentions: mentionIds,
-      });
 
-      await markConversationRead(activeId, user.id);
-      const members = convMembers[activeId] ?? [];
-      const others = members.filter((m) => m !== user.id);
-      const senderName = teamById.get(user.id)?.full_name ?? "teammate";
-      const notifications: Array<{ user_id: string; type: string; message: string; link: string }> =
-        [];
-      if (others.length > 0) {
-        for (const uid of others) {
-          if (mentionIds.includes(uid)) {
-            // Always deliver @mentions
-            notifications.push({
-              user_id: uid,
-              type: "mention",
-              message: `${senderName} mentioned you`,
-              link: "/chat",
-            });
-          } else {
-            // sendNotifications handles profile checking
-            notifications.push({
-              user_id: uid,
-              type: "message",
-              message: `New message from ${senderName}`,
-              link: "/chat",
-            });
+    // 2. Background Persistence & Notification Dispatch
+    (async () => {
+      try {
+        const attachments: ChatAttachment[] = [];
+        for (const f of files) attachments.push(await uploadChatAttachment(activeId, user.id, f));
+        const realMsg = await sendMessage(activeId, user.id, encoded, attachments, {
+          reply_to: reply?.id ?? null,
+          mentions: mentionIds,
+        });
+
+        // Swap temporary message with real DB message
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? (realMsg as Message) : m)));
+
+        markConversationRead(activeId, user.id).catch(() => {});
+        const members = convMembers[activeId] ?? [];
+        const others = members.filter((m) => m !== user.id);
+        const senderName = teamById.get(user.id)?.full_name ?? "teammate";
+        const notifications: Array<{ user_id: string; type: string; message: string; link: string }> =
+          [];
+        if (others.length > 0) {
+          for (const uid of others) {
+            if (mentionIds.includes(uid)) {
+              notifications.push({
+                user_id: uid,
+                type: "mention",
+                message: `${senderName} mentioned you`,
+                link: "/chat",
+              });
+            } else {
+              notifications.push({
+                user_id: uid,
+                type: "message",
+                message: `New message from ${senderName}`,
+                link: "/chat",
+              });
+            }
           }
         }
+        if (notifications.length > 0) sendNotifications(notifications).catch(() => {});
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Failed to send message";
+        toast.error(msg);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        setInput(content);
+        setPendingFiles(files);
+        setReplyTo(reply);
       }
-      if (notifications.length > 0) await sendNotifications(notifications);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to send";
-      toast.error(msg);
-      setInput(content);
-      setPendingFiles(files);
-      setReplyTo(reply);
-    } finally {
-      setUploading(false);
-    }
+    })();
   }
 
   async function handleReactionToggle(messageId: string, emoji: string) {

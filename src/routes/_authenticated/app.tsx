@@ -373,6 +373,8 @@ function TaskChecklistItem({
   const canComplete = task.status === "pending" || task.status === "revision";
   const overdue = isOverdue(task);
 
+  const assignee = team.find((m) => m.id === task.assigned_to);
+  const assigneeName = assignee?.full_name || "Unassigned";
   const assigner = team.find((m) => m.id === task.assigned_by);
   const assignerName = assigner?.full_name || "Administrator";
 
@@ -430,7 +432,8 @@ function TaskChecklistItem({
             </div>
           )}
           <div className="mt-2 text-xs text-slate-500">
-            Assigned by <span className="font-medium text-slate-700">{assignerName}</span>
+            Assigned to <span className="font-bold text-blue-600 dark:text-blue-400">{assigneeName}</span> by{" "}
+            <span className="font-medium text-slate-700">{assignerName}</span>
             {task.deadline && <> · due {new Date(task.deadline).toLocaleString()}</>}
           </div>
           {task.revision_note && (

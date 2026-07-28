@@ -144,7 +144,21 @@ function RootComponent() {
       <AuthProvider>
         <OneSignalInit />
         <Outlet />
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster
+          position="top-center"
+          richColors
+          closeButton
+          toastOptions={{
+            style: {
+              borderRadius: "16px",
+              padding: "12px 18px",
+              boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.1)",
+              backdropFilter: "blur(12px)",
+              fontSize: "14px",
+              fontWeight: 600,
+            },
+          }}
+        />
       </AuthProvider>
     </QueryClientProvider>
   );

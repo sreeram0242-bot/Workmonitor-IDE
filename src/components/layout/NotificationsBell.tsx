@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { fetchNotifications, markNotificationsRead, clearNotifications } from "@/lib/notify.functions";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
+import { toast } from "sonner";
 
 interface NotificationRow {
   id: string;
@@ -76,8 +77,19 @@ export function NotificationsBell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  useRealtimeSubscription("notifications", `user-${user?.id}`, () => {
+  useRealtimeSubscription("notifications", `user-${user?.id}`, (msg: any) => {
     reload();
+    if (msg?.data?.message) {
+      toast.info(`🔔 ${msg.data.message}`, {
+        duration: 5000,
+        action: msg.data.link
+          ? {
+              label: "View",
+              onClick: () => navigate({ to: msg.data.link }),
+            }
+          : undefined,
+      });
+    }
   });
 
   useRealtimeSubscription("notifications", "all-users", (msg: any) => {

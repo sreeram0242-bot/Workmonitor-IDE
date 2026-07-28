@@ -146,11 +146,10 @@ export const sendUrgentBroadcastAlert = createServerFn({ method: "POST" })
     const authResult = await getAuthOrThrow();
 
     // Verify admin role
-    const profile = await prisma.profile.findUnique({
-      where: { id: authResult.userId },
-      select: { role: true },
+    const roleRow = await prisma.userRole.findFirst({
+      where: { user_id: authResult.userId },
     });
-    if (profile?.role !== "admin") {
+    if (roleRow?.role !== "admin") {
       throw new Error("Only admins can send urgent broadcast alerts");
     }
 

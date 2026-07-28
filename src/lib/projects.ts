@@ -7,6 +7,7 @@ import {
   addProjectStage as serverAddProjectStage,
   updateProjectStage as serverUpdateProjectStage,
   deleteProjectStage as serverDeleteProjectStage,
+  reorderProjectStages as serverReorderProjectStages,
 } from "./projects.functions";
 
 export interface ProjectStageRow {
@@ -91,4 +92,8 @@ export async function updateProjectStage(
 
 export async function deleteProjectStage(id: string): Promise<boolean> {
   return await serverDeleteProjectStage({ data: id });
+}
+
+export async function reorderProjectStages(projectId: string, stageIds: string[]): Promise<boolean> {
+  return await serverReorderProjectStages({ data: { projectId, stageIds } });
 }
