@@ -21,11 +21,12 @@ export function UrgentAlertReceiver() {
   } | null>(null);
 
   useRealtimeSubscription("notifications", "all-users", (msg: any) => {
-    if (msg?.data?.type === "urgent_alert") {
+    const payload = msg?.data ?? msg;
+    if (payload?.type === "urgent_alert" || payload?.title || payload?.message) {
       setActiveAlert({
-        title: msg.data.title || "URGENT WORK ALERT",
-        message: msg.data.message || "",
-        link: msg.data.link || "/app",
+        title: payload.title || "URGENT WORK ALERT",
+        message: payload.message || "",
+        link: payload.link || "/app",
       });
       // Play system alert sound & trigger device vibration pattern
       try {

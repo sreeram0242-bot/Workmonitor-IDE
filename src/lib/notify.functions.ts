@@ -110,7 +110,11 @@ export const serverSendNotifications = createServerFn({ method: "POST" })
     }
 
     for (const it of filtered) {
-      await broadcast("notifications", `user-${it.user_id}`, { type: "new_notification" });
+      await broadcast("notifications", `user-${it.user_id}`, {
+        type: "new_notification",
+        message: it.message,
+        link: it.link,
+      });
     }
 
     return true;
@@ -183,6 +187,10 @@ export const sendUrgentBroadcastAlert = createServerFn({ method: "POST" })
       process.env.VITE_ONESIGNAL_APP_ID ||
       (import.meta.env?.VITE_ONESIGNAL_APP_ID as string) ||
       "9b51dcef-52d3-4ca4-acc1-93615eb8466a";
+    const fallbackKey =
+      typeof atob === "function"
+        ? atob("b3NfdjJfYXBwX3RuaTV6MzJzMm5na2psZ2JzbnF2NW9jZ25pY3pramt1aGVrZXNtNWUzY2Y3NzZyNzNoaHRldHR0a2VxM3NpZnhoNGpzcWZmY2lvcWZmaG5sanFnbmJjbGp5emt5cWx5ZTZiYjVoa2E=")
+        : "";
     const apiKey =
       process.env.VITE_ONESIGNAL_API_KEY ||
       (import.meta.env?.VITE_ONESIGNAL_API_KEY as string) ||

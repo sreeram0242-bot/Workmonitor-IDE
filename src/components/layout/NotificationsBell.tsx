@@ -79,13 +79,14 @@ export function NotificationsBell() {
 
   useRealtimeSubscription("notifications", `user-${user?.id}`, (msg: any) => {
     reload();
-    if (msg?.data?.message) {
-      toast.info(`🔔 ${msg.data.message}`, {
+    const payload = msg?.data ?? msg;
+    if (payload?.message) {
+      toast.info(`🔔 ${payload.message}`, {
         duration: 5000,
-        action: msg.data.link
+        action: payload.link
           ? {
               label: "View",
-              onClick: () => navigate({ to: msg.data.link }),
+              onClick: () => navigate({ to: payload.link }),
             }
           : undefined,
       });
@@ -100,9 +101,10 @@ export function NotificationsBell() {
 
   useRealtimeSubscription("notifications", "all-users", (msg: any) => {
     reload();
-    if (msg?.data?.type === "urgent_alert") {
-      toast.error(`🚨 ${msg.data.title || "URGENT ALERT"}`, {
-        description: msg.data.message,
+    const payload = msg?.data ?? msg;
+    if (payload?.type === "urgent_alert" || payload?.title || payload?.message) {
+      toast.error(`🚨 ${payload.title || "URGENT ALERT"}`, {
+        description: payload.message,
         duration: 15000,
       });
     }
