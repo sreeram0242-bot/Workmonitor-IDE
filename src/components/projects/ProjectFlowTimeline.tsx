@@ -127,19 +127,19 @@ export function ProjectFlowTimeline({
                     ? "border-blue-500/40 bg-white shadow-lg ring-1 ring-blue-500/20"
                     : isCompleted
                       ? "border-slate-200/80 bg-slate-50/60"
-                      : "border-slate-200/50 bg-slate-50/30 opacity-75"
+                      : "border-slate-200/70 bg-white"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3
                         className={`font-display text-base ${
                           isCurrent
                             ? "font-bold text-slate-900"
                             : isCompleted
                               ? "font-semibold text-slate-800"
-                              : "font-medium text-slate-500"
+                              : "font-semibold text-slate-700"
                         }`}
                       >
                         {stage.title}
@@ -167,28 +167,28 @@ export function ProjectFlowTimeline({
 
                   {/* Actions for Admin */}
                   {isAdmin && (
-                    <div className="flex items-center gap-1 opacity-90 transition-opacity">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {onReorderStage && stages.length > 1 && (
-                        <div className="flex items-center gap-0.5 border-r border-slate-200 pr-1 mr-1">
+                        <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200/60">
                           <Button
                             size="sm"
                             variant="ghost"
                             disabled={idx === 0}
-                            className="h-7 w-7 p-0 text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-30"
+                            className="h-6 w-6 p-0 text-slate-700 hover:text-blue-700 hover:bg-white rounded disabled:opacity-25"
                             onClick={() => onReorderStage(project.id, idx, idx - 1)}
                             title="Move Stage Up"
                           >
-                            <ChevronUp className="h-4 w-4" />
+                            <ChevronUp className="h-3.5 w-3.5 stroke-[2.5]" />
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             disabled={idx === stages.length - 1}
-                            className="h-7 w-7 p-0 text-slate-500 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-30"
+                            className="h-6 w-6 p-0 text-slate-700 hover:text-blue-700 hover:bg-white rounded disabled:opacity-25"
                             onClick={() => onReorderStage(project.id, idx, idx + 1)}
                             title="Move Stage Down"
                           >
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-3.5 w-3.5 stroke-[2.5]" />
                           </Button>
                         </div>
                       )}
@@ -196,7 +196,7 @@ export function ProjectFlowTimeline({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2 text-xs text-blue-700 hover:bg-blue-50 font-medium"
+                          className="h-7 px-2.5 text-xs text-blue-700 hover:bg-blue-50 font-bold border border-blue-200/60 rounded-lg"
                           onClick={() => onSetCurrentStage(project.id, idx)}
                           title="Set as Current Stage"
                         >

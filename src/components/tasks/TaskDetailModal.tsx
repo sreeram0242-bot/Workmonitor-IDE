@@ -136,24 +136,27 @@ export function TaskDetailModal({
 
   async function handleExtendDeadline() {
     if (!task || !newDeadline) return;
-    setBusy(true);
+    const isoDeadline = new Date(newDeadline).toISOString();
+    
+    // 0ms Instant Optimistic UI Update
+    toast.success("Deadline extended successfully!");
+    setShowExtendModal(false);
+    task.deadline = isoDeadline;
+    onDone?.();
+
     try {
-      await updateTask(task.id, { deadline: new Date(newDeadline).toISOString() });
-      await sendNotifications([
+      await updateTask(task.id, { deadline: isoDeadline });
+      sendNotifications([
         {
           user_id: task.assigned_to,
           type: "task_extended",
           message: `Deadline extended for: ${task.title}`,
           link: "/app",
         },
-      ]);
-      toast.success("Deadline extended successfully");
-      setShowExtendModal(false);
-      onDone?.();
+      ]).catch(() => {});
     } catch (e: any) {
-      toast.error(e.message || "Failed to extend deadline");
-    } finally {
-      setBusy(false);
+      console.error("Failed to persist extended deadline:", e);
+      toast.error(e.message || "Failed to persist extended deadline");
     }
   }
 
